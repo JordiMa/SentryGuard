@@ -8,6 +8,7 @@ import {
   TelegramConfig,
   TelegramLinkStatus,
 } from '../../entities/telegram-config.entity';
+import { Vehicle } from '../../entities/vehicle.entity';
 import { UserLanguageService } from '../user/user-language.service';
 
 interface TelegramKeyboard {
@@ -40,6 +41,8 @@ export class TelegramBotService implements OnModuleInit {
   constructor(
     @InjectRepository(TelegramConfig)
     private readonly telegramConfigRepository: Repository<TelegramConfig>,
+    @InjectRepository(Vehicle)
+    private readonly vehicleRepository: Repository<Vehicle>,
     private readonly userLanguageService: UserLanguageService
   ) {}
 
@@ -125,6 +128,11 @@ export class TelegramBotService implements OnModuleInit {
       return false;
     }
 
+    if (config.muted_until && new Date() < config.muted_until) {
+      this.logger.log(`🔕 Notifications muted for user ${userId} until ${config.muted_until}`);
+      return false;
+    }
+
     const telegramOptions = this.buildTelegramOptions(options);
     await this.bot.telegram.sendMessage(config.chat_id, message, telegramOptions);
 
@@ -178,25 +186,52 @@ export class TelegramBotService implements OnModuleInit {
         const linkToken = args[1];
         await this.handleLinkToken(ctx, linkToken);
       } else {
-        const lng = await this.getUserLanguageFromChatId(
-          ctx.chat.id.toString()
-        );
-        await ctx.reply(i18n.t('Welcome to SentryGuard Bot', { lng }));
+        await this.handleStartWithoutToken(ctx);
+      }
+    });
+
+    this.bot.hears(
+      [i18n.t('menuButtonStatus', { lng: 'en' }), i18n.t('menuButtonStatus', { lng: 'fr' })],
+      async (ctx) => {
+        await this.handleStatusButton(ctx);
+      }
+    );
+
+    this.bot.hears(
+      [
+        i18n.t('menuButtonMute', { lng: 'en' }),
+        i18n.t('menuButtonMute', { lng: 'fr' }),
+        i18n.t('menuButtonMuteActive', { lng: 'en' }),
+        i18n.t('menuButtonMuteActive', { lng: 'fr' }),
+      ],
+      async (ctx) => {
+        await this.handleMuteButton(ctx);
+      }
+    );
+
+    this.bot.action(/^mute:(\d+)$/, async (ctx) => {
+      await this.handleMuteDuration(ctx);
+    });
+
+    this.bot.action('mute:reactivate', async (ctx) => {
+      await this.handleMuteReactivate(ctx);
+    });
+
+    this.bot.action('mute:change', async (ctx) => {
+      await this.handleMuteChange(ctx);
+    });
+
+    this.bot.action('mute:cancel', async (ctx) => {
+      try {
+        await ctx.answerCbQuery();
+        await ctx.deleteMessage();
+      } catch (error) {
+        this.logger.warn(`⚠️ Error handling mute cancel: ${error}`, error);
       }
     });
 
     this.bot.command('status', async (ctx) => {
-      const chatId = ctx.chat.id.toString();
-      const lng = await this.getUserLanguageFromChatId(chatId);
-      const config = await this.telegramConfigRepository.findOne({
-        where: { chat_id: chatId, status: TelegramLinkStatus.LINKED },
-      });
-
-      if (config) {
-        await ctx.reply(i18n.t('Your account is linked and active!', { lng }));
-      } else {
-        await ctx.reply(i18n.t('No account linked', { lng }));
-      }
+      await this.handleStatusButton(ctx);
     });
 
     this.bot.help(async (ctx) => {
@@ -205,6 +240,221 @@ export class TelegramBotService implements OnModuleInit {
       );
       await ctx.reply(i18n.t('Available commands', { lng }));
     });
+  }
+
+  private async handleStartWithoutToken(ctx: Context): Promise<void> {
+    const chatId = ctx.chat.id.toString();
+    const lng = await this.getUserLanguageFromChatId(chatId);
+    const config = await this.telegramConfigRepository.findOne({
+      where: { chat_id: chatId, status: TelegramLinkStatus.LINKED },
+    });
+    const welcomeMessage = i18n.t('Welcome to SentryGuard Bot', { lng });
+
+    if (config) {
+      await this.safeReply(ctx, welcomeMessage, this.buildMainMenuKeyboard(lng, config.muted_until));
+    } else {
+      await this.safeReply(ctx, welcomeMessage);
+    }
+  }
+
+  private async handleStatusButton(ctx: Context): Promise<void> {
+    const chatId = ctx.chat.id.toString();
+    const lng = await this.getUserLanguageFromChatId(chatId);
+    const config = await this.telegramConfigRepository.findOne({
+      where: { chat_id: chatId, status: TelegramLinkStatus.LINKED },
+    });
+
+    if (!config) {
+      await this.safeReply(ctx, i18n.t('No account linked', { lng }));
+      return;
+    }
+
+    const vehicles = await this.vehicleRepository.find({ where: { userId: config.userId } });
+    await this.safeReply(ctx, this.buildConfigurationStatusMessage(config, vehicles, lng), this.buildMainMenuKeyboard(lng, config.muted_until));
+  }
+
+  private buildConfigurationStatusMessage(
+    config: TelegramConfig,
+    vehicles: Vehicle[],
+    lng: 'en' | 'fr'
+  ): string {
+    return [
+      i18n.t('configStatusTitle', { lng }),
+      '',
+      this.buildTelegramSection(config, lng),
+      '',
+      this.buildVehiclesSection(vehicles, lng),
+    ].join('\n');
+  }
+
+  private buildTelegramSection(config: TelegramConfig, lng: 'en' | 'fr'): string {
+    const locale = lng === 'fr' ? 'fr-FR' : 'en-GB';
+    const date = config.linked_at
+      ? config.linked_at.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })
+      : '—';
+    const lines = [i18n.t('configStatusTelegram', { lng }), i18n.t('configStatusTelegramLinked', { lng, date })];
+
+    if (config.muted_until && new Date() < config.muted_until) {
+      lines.push(i18n.t('configStatusMutedUntil', { lng, duration: this.formatRemainingTime(config.muted_until) }));
+    }
+
+    return lines.join('\n');
+  }
+
+  private buildVehiclesSection(vehicles: Vehicle[], lng: 'en' | 'fr'): string {
+    const header = i18n.t('configStatusVehicles', { lng });
+
+    if (vehicles.length === 0) {
+      return [header, i18n.t('configStatusNoVehicles', { lng })].join('\n');
+    }
+
+    return [header, ...vehicles.map((vehicle) => this.buildVehicleLine(vehicle, lng))].join('\n');
+  }
+
+  private buildVehicleLine(vehicle: Vehicle, lng: 'en' | 'fr'): string {
+    const name = vehicle.display_name || vehicle.vin;
+    const telemetryKey = vehicle.telemetry_enabled ? 'configStatusTelemetryActive' : 'configStatusTelemetryInactive';
+
+    return `• ${name} — ${i18n.t(telemetryKey, { lng })}`;
+  }
+
+  private buildMainMenuKeyboard(lng: 'en' | 'fr', mutedUntil: Date | null | undefined = null): TelegramMessageOptions {
+    const isMuted = mutedUntil != null && new Date() < mutedUntil;
+    const muteButtonKey = isMuted ? 'menuButtonMuteActive' : 'menuButtonMute';
+
+    return {
+      keyboard: {
+        keyboard: [[
+          { text: i18n.t('menuButtonStatus', { lng }) },
+          { text: i18n.t(muteButtonKey, { lng }) },
+        ]],
+        resize_keyboard: true,
+      },
+    };
+  }
+
+  private async handleMuteButton(ctx: Context): Promise<void> {
+    const chatId = ctx.chat.id.toString();
+    const lng = await this.getUserLanguageFromChatId(chatId);
+    const config = await this.telegramConfigRepository.findOne({
+      where: { chat_id: chatId, status: TelegramLinkStatus.LINKED },
+    });
+
+    if (config?.muted_until && new Date() < config.muted_until) {
+      const duration = this.formatRemainingTime(config.muted_until);
+      await this.safeReply(ctx, i18n.t('muteAlreadyActive', { lng, duration }), this.buildMuteActiveKeyboard(lng));
+    } else {
+      await this.safeReply(ctx, i18n.t('muteDurationTitle', { lng }), this.buildMuteDurationKeyboard());
+    }
+  }
+
+  private buildMuteActiveKeyboard(lng: 'en' | 'fr'): TelegramMessageOptions {
+    return {
+      keyboard: {
+        inline_keyboard: [
+          [{ text: i18n.t('muteReactivate', { lng }), callback_data: 'mute:reactivate' }],
+          [{ text: i18n.t('muteChangeDuration', { lng }), callback_data: 'mute:change' }],
+          [{ text: '❌', callback_data: 'mute:cancel' }],
+        ],
+      },
+    };
+  }
+
+  private async handleMuteReactivate(ctx: Context): Promise<void> {
+    try {
+      const chatId = ctx.chat.id.toString();
+      const lng = await this.getUserLanguageFromChatId(chatId);
+      await this.clearMutedUntil(chatId);
+      await ctx.answerCbQuery();
+      await ctx.deleteMessage();
+      await this.safeReply(ctx, i18n.t('muteReactivated', { lng }), this.buildMainMenuKeyboard(lng));
+    } catch (error) {
+      this.logger.warn(`⚠️ Error handling mute reactivate: ${error}`, error);
+      await ctx.answerCbQuery();
+    }
+  }
+
+  private async handleMuteChange(ctx: Context): Promise<void> {
+    try {
+      const chatId = ctx.chat.id.toString();
+      const lng = await this.getUserLanguageFromChatId(chatId);
+      await ctx.answerCbQuery();
+      await ctx.deleteMessage();
+      await this.safeReply(ctx, i18n.t('muteDurationTitle', { lng }), this.buildMuteDurationKeyboard());
+    } catch (error) {
+      this.logger.warn(`⚠️ Error handling mute change: ${error}`, error);
+      await ctx.answerCbQuery();
+    }
+  }
+
+  private async clearMutedUntil(chatId: string): Promise<void> {
+    await this.telegramConfigRepository.update(
+      { chat_id: chatId, status: TelegramLinkStatus.LINKED },
+      { muted_until: null }
+    );
+  }
+
+  private buildMuteDurationKeyboard(): TelegramMessageOptions {
+    return {
+      keyboard: {
+        inline_keyboard: this.buildMuteDurationRows(),
+      },
+    };
+  }
+
+  private buildMuteDurationRows(): Array<Array<{ text: string; callback_data: string }>> {
+    return [
+      [
+        { text: '30 min', callback_data: 'mute:30' },
+        { text: '1h', callback_data: 'mute:60' },
+        { text: '2h', callback_data: 'mute:120' },
+      ],
+      [
+        { text: '4h', callback_data: 'mute:240' },
+        { text: '8h', callback_data: 'mute:480' },
+        { text: '24h', callback_data: 'mute:1440' },
+      ],
+      [{ text: '❌', callback_data: 'mute:cancel' }],
+    ];
+  }
+
+  private async handleMuteDuration(ctx: Context): Promise<void> {
+    try {
+      const minutes = parseInt(ctx.match[1]);
+      const chatId = ctx.chat.id.toString();
+      const lng = await this.getUserLanguageFromChatId(chatId);
+      const mutedUntil = new Date(Date.now() + minutes * 60 * 1000);
+
+      await this.saveMutedUntil(chatId, mutedUntil);
+      await this.confirmMute(ctx, mutedUntil, lng);
+    } catch (error) {
+      this.logger.warn(`⚠️ Error handling mute duration: ${error}`, error);
+      await ctx.answerCbQuery();
+    }
+  }
+
+  private async saveMutedUntil(chatId: string, mutedUntil: Date): Promise<void> {
+    await this.telegramConfigRepository.update(
+      { chat_id: chatId, status: TelegramLinkStatus.LINKED },
+      { muted_until: mutedUntil }
+    );
+  }
+
+  private async confirmMute(ctx: Context, mutedUntil: Date, lng: 'en' | 'fr'): Promise<void> {
+    const confirmation = i18n.t('muteConfirmed', { lng, duration: this.formatRemainingTime(mutedUntil) });
+    await ctx.answerCbQuery();
+    await ctx.deleteMessage();
+    await this.safeReply(ctx, confirmation, this.buildMainMenuKeyboard(lng, mutedUntil));
+  }
+
+  private formatRemainingTime(date: Date): string {
+    const totalMinutes = Math.ceil((date.getTime() - Date.now()) / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours > 0 && minutes > 0) return `${hours}h ${minutes}min`;
+    if (hours > 0) return `${hours}h`;
+    return `${Math.max(1, totalMinutes)}min`;
   }
 
   private async setupPollingMode() {
@@ -349,7 +599,7 @@ export class TelegramBotService implements OnModuleInit {
       i18n.t('Your SentryGuard account has been linked successfully!', { lng })
     );
 
-    await this.safeReply(ctx, i18n.t('telegramLinkedFollowUp', { lng }));
+    await this.safeReply(ctx, i18n.t('telegramLinkedFollowUp', { lng }), this.buildMainMenuKeyboard(lng));
   }
 
   private getWebhookPath(secretPath: string): string {

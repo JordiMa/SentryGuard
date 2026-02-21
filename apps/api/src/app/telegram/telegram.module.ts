@@ -12,13 +12,14 @@ import { RetryManager } from '../shared/retry-manager.service';
 import { telegramRetryManager } from './telegram-retry-manager.token';
 import { TelegramConfig } from '../../entities/telegram-config.entity';
 import { User } from '../../entities/user.entity';
+import { Vehicle } from '../../entities/vehicle.entity';
 import { AuthModule } from '../auth/auth.module';
 import { ConsentModule } from '../consent/consent.module';
 import { UserModule } from '../user/user.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TelegramConfig, User]),
+    TypeOrmModule.forFeature([TelegramConfig, User, Vehicle]),
     AuthModule,
     ConsentModule,
     UserModule,

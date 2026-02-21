@@ -43,6 +43,9 @@ export class TelegramConfig {
   @Column({ type: 'timestamp', nullable: true })
   expires_at?: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  muted_until?: Date | null;
+
   @CreateDateColumn()
   created_at: Date;
 
