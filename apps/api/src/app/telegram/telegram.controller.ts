@@ -82,12 +82,11 @@ export class TelegramController {
 
     const deepLink = `https://t.me/${botUsername}?start=${linkToken}`;
 
-    this.logger.log(`✅ Link generated for ${userId}: ${deepLink}`);
+    this.logger.log(`✅ Link generated for ${userId}, expires at ${expiresAt.toISOString()}`);
 
     return {
       success: true,
       link: deepLink,
-      token: linkToken,
       expires_at: expiresAt,
       expires_in_minutes: this.LINK_EXPIRATION_MINUTES,
     };

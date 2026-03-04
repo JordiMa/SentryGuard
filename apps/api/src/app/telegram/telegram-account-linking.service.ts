@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as crypto from 'crypto';
 import { Context } from 'telegraf';
 import i18n from '../../i18n';
 import { TelegramConfig, TelegramLinkStatus } from '../../entities/telegram-config.entity';
@@ -61,13 +62,13 @@ export class TelegramAccountLinkingService implements OnModuleInit {
   private async handleLinkToken(ctx: Context, linkToken: string): Promise<void> {
     try {
       const config = await this.findPendingConfig(linkToken);
-      const lng = await this.getLanguageForConfig(config);
 
       if (!config) {
-        await this.safeReply(ctx, i18n.t('Invalid or expired token', { lng }));
+        await this.safeReply(ctx, i18n.t('Invalid or expired token', { lng: 'en' }));
         return;
       }
 
+      const lng = await this.getLanguageForConfig(config);
       const isExpired = await this.handleExpiredToken(ctx, config, lng);
       if (isExpired) return;
 
@@ -117,6 +118,7 @@ export class TelegramAccountLinkingService implements OnModuleInit {
     config.status = TelegramLinkStatus.LINKED;
     config.linked_at = new Date();
     config.bot_ui_version = CURRENT_BOT_UI_VERSION;
+    config.link_token = crypto.randomBytes(32).toString('hex');
     await this.telegramConfigRepository.save(config);
 
     this.logger.log(`✅ Account linked: userId=${config.userId}, chatId=${chatId}`);

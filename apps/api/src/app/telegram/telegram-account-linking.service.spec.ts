@@ -212,6 +212,16 @@ describe('The TelegramAccountLinkingService class', () => {
         );
       });
 
+      it('should rotate the link_token after successful linking', async () => {
+        const ctx = buildCtx(`/start ${fakeLinkToken}`);
+
+        await registeredStartHandler(ctx);
+
+        const savedConfig = mockTelegramConfigRepository.save.mock.calls[0][0];
+        expect(savedConfig.link_token).toBeDefined();
+        expect(savedConfig.link_token).not.toBe(fakeLinkToken);
+      });
+
       it('should send the success message', async () => {
         const ctx = buildCtx(`/start ${fakeLinkToken}`);
 

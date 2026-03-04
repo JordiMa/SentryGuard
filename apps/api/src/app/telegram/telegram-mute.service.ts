@@ -77,8 +77,10 @@ export class TelegramMuteService implements OnModuleInit {
   }
 
   private async handleMuteDuration(ctx: Context): Promise<void> {
+    const MAX_MUTE_MINUTES = 1440;
+
     try {
-      const minutes = parseInt(ctx.match[1]);
+      const minutes = Math.min(parseInt(ctx.match[1]), MAX_MUTE_MINUTES);
       const chatId = ctx.chat.id.toString();
       const lng = await this.contextService.getUserLanguageFromChatId(chatId);
       const mutedUntil = new Date(Date.now() + minutes * MILLISECONDS_PER_MINUTE);

@@ -306,7 +306,6 @@ export async function deleteTelemetryConfig(vin: string): Promise<{
 export interface TelegramLinkInfo {
   success: boolean;
   link: string;
-  token: string;
   expires_at: string;
   expires_in_minutes: number;
 }
