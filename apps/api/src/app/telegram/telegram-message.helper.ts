@@ -1,7 +1,9 @@
+import { Logger } from '@nestjs/common';
+import { Context } from 'telegraf';
 import { TelegramMessageOptions } from './telegram.types';
 
 const MINUTES_PER_HOUR = 60;
-const MILLISECONDS_PER_MINUTE = 60_000;
+export const MILLISECONDS_PER_MINUTE = 60_000;
 const MINIMUM_DISPLAY_MINUTES = 1;
 
 export class TelegramMessageHelper {
@@ -21,6 +23,15 @@ export class TelegramMessageHelper {
       parse_mode: options?.parse_mode ?? 'HTML',
       ...TelegramMessageHelper.buildReplyMarkup(options),
     };
+  }
+
+  static async safeReply(ctx: Context, message: string, options: TelegramMessageOptions | undefined, logger: Logger): Promise<void> {
+    try {
+      const telegramOptions = TelegramMessageHelper.buildOptions(options);
+      await ctx.reply(message, Object.keys(telegramOptions).length > 1 ? telegramOptions : undefined);
+    } catch (error) {
+      logger.warn(`⚠️ Could not send message to user (possibly blocked the bot): ${error}`, error);
+    }
   }
 
   private static buildReplyMarkup(options?: TelegramMessageOptions): Record<string, unknown> {

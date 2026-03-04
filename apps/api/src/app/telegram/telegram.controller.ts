@@ -82,7 +82,7 @@ export class TelegramController {
 
     const deepLink = `https://t.me/${botUsername}?start=${linkToken}`;
 
-    this.logger.log(`✅ Lien généré pour ${userId}: ${deepLink}`);
+    this.logger.log(`✅ Link generated for ${userId}: ${deepLink}`);
 
     return {
       success: true,

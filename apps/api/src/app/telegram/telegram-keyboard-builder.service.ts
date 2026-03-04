@@ -5,7 +5,6 @@ import { TelegramMessageOptions } from './telegram.types';
 @Injectable()
 export class TelegramKeyboardBuilderService {
   buildSentryAlertKeyboard(
-    alertInfo: { vin: string },
     userId: string,
     userLanguage: 'en' | 'fr'
   ) {

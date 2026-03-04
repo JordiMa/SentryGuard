@@ -8,7 +8,7 @@ import { TelegramBotService } from './telegram-bot.service';
 import { TelegramKeyboardBuilderService } from './telegram-keyboard-builder.service';
 import { TelegramContextService } from './telegram-context.service';
 import { TelegramMessageOptions } from './telegram.types';
-import { TelegramMessageHelper } from './telegram-message.helper';
+import { TelegramMessageHelper, MILLISECONDS_PER_MINUTE } from './telegram-message.helper';
 
 @Injectable()
 export class TelegramMuteService implements OnModuleInit {
@@ -22,7 +22,7 @@ export class TelegramMuteService implements OnModuleInit {
     private readonly contextService: TelegramContextService,
   ) {}
 
-  async isNotificationMuted(userId: string): Promise<boolean> {
+  async checkIsNotificationMuted(userId: string): Promise<boolean> {
     const config = await this.telegramConfigRepository.findOne({
       where: { userId, status: TelegramLinkStatus.LINKED },
     });
@@ -63,10 +63,10 @@ export class TelegramMuteService implements OnModuleInit {
 
   private async handleMuteButton(ctx: Context): Promise<void> {
     const chatId = ctx.chat.id.toString();
-    const lng = await this.contextService.getUserLanguageFromChatId(chatId);
-    const config = await this.telegramConfigRepository.findOne({
-      where: { chat_id: chatId, status: TelegramLinkStatus.LINKED },
-    });
+    const [lng, config] = await Promise.all([
+      this.contextService.getUserLanguageFromChatId(chatId),
+      this.telegramConfigRepository.findOne({ where: { chat_id: chatId, status: TelegramLinkStatus.LINKED } }),
+    ]);
 
     if (config?.muted_until && new Date() < config.muted_until) {
       const duration = TelegramMessageHelper.formatRemainingTime(config.muted_until);
@@ -81,7 +81,7 @@ export class TelegramMuteService implements OnModuleInit {
       const minutes = parseInt(ctx.match[1]);
       const chatId = ctx.chat.id.toString();
       const lng = await this.contextService.getUserLanguageFromChatId(chatId);
-      const mutedUntil = new Date(Date.now() + minutes * 60 * 1000);
+      const mutedUntil = new Date(Date.now() + minutes * MILLISECONDS_PER_MINUTE);
 
       await this.saveMutedUntil(chatId, mutedUntil);
       this.logger.log(`[MUTE] chat_id=${chatId} muted for ${minutes}min until ${mutedUntil.toISOString()}`);
@@ -98,8 +98,7 @@ export class TelegramMuteService implements OnModuleInit {
       const lng = await this.contextService.getUserLanguageFromChatId(chatId);
       await this.clearMutedUntil(chatId);
       this.logger.log(`[MUTE] chat_id=${chatId} reactivated alerts`);
-      await ctx.answerCbQuery();
-      await ctx.deleteMessage();
+      await Promise.all([ctx.answerCbQuery(), ctx.deleteMessage()]);
       await this.safeReply(ctx, i18n.t('muteReactivated', { lng }), this.keyboardBuilderService.buildMainMenuKeyboard(lng));
     } catch (error) {
       this.logger.warn(`⚠️ Error handling mute reactivate: ${error}`, error);
@@ -152,11 +151,6 @@ export class TelegramMuteService implements OnModuleInit {
   }
 
   private async safeReply(ctx: Context, message: string, options?: TelegramMessageOptions): Promise<void> {
-    try {
-      const telegramOptions = TelegramMessageHelper.buildOptions(options);
-      await ctx.reply(message, Object.keys(telegramOptions).length > 1 ? telegramOptions : undefined);
-    } catch (error) {
-      this.logger.warn(`⚠️ Could not send message to user (possibly blocked the bot): ${error}`, error);
-    }
+    await TelegramMessageHelper.safeReply(ctx, message, options, this.logger);
   }
 }

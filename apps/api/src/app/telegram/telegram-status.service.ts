@@ -105,11 +105,6 @@ export class TelegramStatusService implements OnModuleInit {
   }
 
   private async safeReply(ctx: Context, message: string, options?: TelegramMessageOptions): Promise<void> {
-    try {
-      const telegramOptions = TelegramMessageHelper.buildOptions(options);
-      await ctx.reply(message, Object.keys(telegramOptions).length > 1 ? telegramOptions : undefined);
-    } catch (error) {
-      this.logger.warn(`⚠️ Could not send message to user (possibly blocked the bot): ${error}`, error);
-    }
+    await TelegramMessageHelper.safeReply(ctx, message, options, this.logger);
   }
 }

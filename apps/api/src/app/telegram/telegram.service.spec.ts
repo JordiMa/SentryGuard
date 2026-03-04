@@ -49,7 +49,7 @@ describe('The TelegramService class', () => {
   const mockRetryManager: MockProxy<RetryManager> = mock<RetryManager>();
 
   beforeEach(async () => {
-    mockTelegramMuteService.isNotificationMuted.mockResolvedValue(false);
+    mockTelegramMuteService.checkIsNotificationMuted.mockResolvedValue(false);
     mockTelegramContextService.getChatIdFromUserId.mockResolvedValue(fakeChatId);
     mockTelegramBotUpdateService.ensureUserIsUpToDate.mockResolvedValue(undefined);
     mockTelegramFailureHandler.canHandle.mockReturnValue(false);
@@ -83,7 +83,7 @@ describe('The TelegramService class', () => {
 
     describe('When the user is muted', () => {
       beforeEach(() => {
-        mockTelegramMuteService.isNotificationMuted.mockResolvedValue(true);
+        mockTelegramMuteService.checkIsNotificationMuted.mockResolvedValue(true);
       });
 
       it('should return false without sending a message', async () => {

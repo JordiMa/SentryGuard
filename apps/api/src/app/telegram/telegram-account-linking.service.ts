@@ -26,7 +26,8 @@ export class TelegramAccountLinkingService implements OnModuleInit {
 
   onModuleInit(): void {
     this.botService.registerStart(async (ctx) => {
-      const args = ctx.message.text.split(' ');
+      const text = (ctx.message as { text: string } | undefined)?.text ?? '';
+      const args = text.split(' ');
       const linkToken = args.length > 1 ? args[1] : undefined;
       await this.handleStart(ctx, linkToken);
     });
@@ -41,6 +42,8 @@ export class TelegramAccountLinkingService implements OnModuleInit {
   }
 
   private async handleStartWithoutToken(ctx: Context): Promise<void> {
+    if (!ctx.chat) return;
+
     const chatId = ctx.chat.id.toString();
     const lng = await this.contextService.getUserLanguageFromChatId(chatId);
     const config = await this.telegramConfigRepository.findOne({
@@ -125,11 +128,6 @@ export class TelegramAccountLinkingService implements OnModuleInit {
   }
 
   private async safeReply(ctx: Context, message: string, options?: TelegramMessageOptions): Promise<void> {
-    try {
-      const telegramOptions = TelegramMessageHelper.buildOptions(options);
-      await ctx.reply(message, Object.keys(telegramOptions).length > 1 ? telegramOptions : undefined);
-    } catch (error) {
-      this.logger.warn(`⚠️ Could not send message to user (possibly blocked the bot): ${error}`, error);
-    }
+    await TelegramMessageHelper.safeReply(ctx, message, options, this.logger);
   }
 }

@@ -40,7 +40,7 @@ export class TelegramService implements OnModuleDestroy {
 
     const message = this.formatSentryAlertMessage(alertInfo, userLanguage);
 
-    if (await this.telegramMuteService.isNotificationMuted(userId)) {
+    if (await this.telegramMuteService.checkIsNotificationMuted(userId)) {
       this.logger.log(`🔕 Sentry alert suppressed for muted user ${userId}`);
       return false;
     }
