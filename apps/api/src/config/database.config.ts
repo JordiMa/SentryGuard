@@ -8,6 +8,18 @@ import { Waitlist } from '../entities/waitlist.entity';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+const buildSslConfig = (): boolean | { ca: string; rejectUnauthorized: boolean } => {
+  if (process.env.DATABASE_SSL !== 'true') return false;
+
+  const caCertBase64 = process.env.DATABASE_SSL_CA_CERT_BASE64;
+  if (!caCertBase64) return true;
+
+  return {
+    ca: Buffer.from(caCertBase64, 'base64').toString('utf-8'),
+    rejectUnauthorized: true,
+  };
+};
+
 const requireProdEnv = (name: string): string => {
   const value = process.env[name];
   if (!value) {
@@ -52,7 +64,7 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => {
     migrationsRun,
     migrations: ['dist/migrations/*.js'],
     logging: process.env.DATABASE_LOGGING === 'true',
-    ssl: process.env.DATABASE_SSL === 'true',
+    ssl: buildSslConfig(),
     extra: {
       max: parseInt(process.env.DATABASE_POOL_MAX || '10', 10),
       connectionTimeoutMillis: parseInt(process.env.DATABASE_CONNECTION_TIMEOUT || '10000', 10),
@@ -81,7 +93,7 @@ export const dataSourceOptions: DataSourceOptions = {
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
   logging: process.env.DATABASE_LOGGING === 'true',
-  ssl: process.env.DATABASE_SSL === 'true'
+  ssl: buildSslConfig(),
 };
 
 // Default export for TypeORM CLI
