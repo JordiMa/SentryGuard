@@ -3,7 +3,6 @@ export const oauthProviderRequirementsSymbol = Symbol('OAuthProviderRequirements
 export interface OAuthUserProfile {
   email?: string;
   full_name?: string;
-  profile_image_url?: string;
 }
 
 export interface OAuthTokensResponse {

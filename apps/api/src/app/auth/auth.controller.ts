@@ -88,7 +88,6 @@ export class AuthController {
       userId: string;
       email?: string;
       full_name?: string;
-      profile_image_url?: string;
     };
   }> {
     this.logger.log(`Retrieving profile for user: ${user.userId}`);
@@ -99,7 +98,6 @@ export class AuthController {
         userId: user.userId,
         email: user.email,
         full_name: user.full_name,
-        profile_image_url: user.profile_image_url,
       },
     };
   }

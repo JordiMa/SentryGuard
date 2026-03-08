@@ -92,7 +92,6 @@ export class UserRegistrationService {
     user.refresh_token = encryptedRefreshToken;
     user.expires_at = tokens.expiresAt;
     user.full_name = profile?.full_name;
-    user.profile_image_url = profile?.profile_image_url;
 
     const userId = user.userId;
 
@@ -143,7 +142,6 @@ export class UserRegistrationService {
       userId,
       email: profile?.email,
       full_name: profile?.full_name,
-      profile_image_url: profile?.profile_image_url,
       access_token: encryptedAccessToken,
       refresh_token: encryptedRefreshToken,
       expires_at: tokens.expiresAt,

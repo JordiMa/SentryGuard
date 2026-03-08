@@ -19,9 +19,6 @@ export class User {
   @Column({ type: 'varchar', length: 255, nullable: true })
   full_name?: string;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
-  profile_image_url?: string;
-
   @Column({ type: 'text', nullable: true })
   jwt_token?: string | null;
 

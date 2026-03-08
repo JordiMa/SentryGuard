@@ -162,7 +162,6 @@ export interface UserProfile {
   userId: string;
   email?: string;
   full_name?: string;
-  profile_image_url?: string;
 }
 
 export interface ValidateTokenResponse {
