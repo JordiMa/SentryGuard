@@ -5,13 +5,13 @@ export class RenameTelemetryEnabledToSentryModeMonitoringEnabled1773100800003 im
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "vehicle" RENAME COLUMN "telemetry_enabled" TO "sentry_mode_monitoring_enabled"`
+      `ALTER TABLE "vehicles" RENAME COLUMN "telemetry_enabled" TO "sentry_mode_monitoring_enabled"`
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "vehicle" RENAME COLUMN "sentry_mode_monitoring_enabled" TO "telemetry_enabled"`
+      `ALTER TABLE "vehicles" RENAME COLUMN "sentry_mode_monitoring_enabled" TO "telemetry_enabled"`
     );
   }
 }
