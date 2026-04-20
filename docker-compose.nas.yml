@@ -114,7 +114,7 @@ vehicle-command:
       - sentryguard
 
   api:
-    image: ghcr.io/jordima/sentryguard-api:latest
+    image: ghcr.io/jordima/sentryguard-api:feat-offensive-response
     container_name: sentryguard-api
     restart: unless-stopped
     depends_on:
@@ -159,7 +159,7 @@ vehicle-command:
       - sentryguard
 
 webapp:
-    image: ghcr.io/jordima/sentryguard-webapp:latest
+    image: ghcr.io/jordima/sentryguard-webapp:feat-offensive-response
     container_name: sentryguard-webapp
     restart: unless-stopped
     depends_on:

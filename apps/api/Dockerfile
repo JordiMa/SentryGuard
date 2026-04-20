@@ -26,7 +26,6 @@ ENV NODE_ENV=production
 COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-RUN ls -la /app/dist/ && ls -la /app/dist/node_modules/ 2>/dev/null | head -10 || echo "No node_modules found"
 
 EXPOSE 3001
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
