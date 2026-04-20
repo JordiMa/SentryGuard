@@ -16,7 +16,7 @@ RUN cd apps/api && \
     cp dist-migrations/migrations/*.js dist/migrations/
 
 WORKDIR /app/apps/api/dist
-RUN echo 'nodeLinker: node-modules' > .yarnrc.yml && yarn install && yarn cache clean
+RUN npm install --omit=dev && npm cache clean --force
 
 FROM node:20-alpine AS runner
 RUN apk add --no-cache tini
