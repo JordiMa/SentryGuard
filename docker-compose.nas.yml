@@ -166,7 +166,7 @@ webapp:
       api:
         condition: service_started
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.sentryguard.jordimarzo.fr}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3021}
     ports:
       - "${WEBAPP_PORT:-3020}:3000"
     networks:
