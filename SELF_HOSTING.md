@@ -161,32 +161,77 @@ The webapp already proxies this path to the API via `next.config.js`. The API se
 
 ## 5. Generate Certificates
 
-Run this script on your local machine (requires `openssl`):
+You need `openssl` installed. Create the `fleet-telemetry/certs/` directory and run each step below.
+
+### 5.1 Generate the CA Certificate
 
 ```bash
-# Optionally override the fleet-telemetry hostname:
-# FLEET_HOSTNAME=fleet-telemetry.yourdomain.com ./scripts/generate-certs.sh
-./scripts/generate-certs.sh
+mkdir -p fleet-telemetry/certs
+cd fleet-telemetry/certs
+
+openssl ecparam -name prime256v1 -genkey -noout -out ca.key
+openssl req -x509 -nodes -new -key ca.key \
+  -subj "/CN=SentryGuard Fleet Telemetry CA" \
+  -out ca.crt \
+  -sha256 -days 3650 \
+  -addext "basicConstraints=critical,CA:TRUE" \
+  -addext "keyUsage=critical,keyCertSign,cRLSign"
 ```
 
-This generates the following files in `fleet-telemetry/certs/`:
+### 5.2 Generate the Server Certificate (signed by CA)
+
+Replace `fleet-telemetry.yourdomain.com` with your actual fleet-telemetry hostname:
+
+```bash
+FLEET_HOSTNAME=fleet-telemetry.yourdomain.com
+
+openssl ecparam -name prime256v1 -genkey -noout -out tls.key
+
+openssl req -new -key tls.key \
+  -subj "/CN=${FLEET_HOSTNAME}" \
+  -out tls.csr
+
+openssl x509 -req -in tls.csr \
+  -CA ca.crt \
+  -CAkey ca.key \
+  -CAcreateserial \
+  -out tls.crt \
+  -sha256 -days 3650 \
+  -extfile <(printf "extendedKeyUsage=serverAuth\nkeyUsage=digitalSignature,keyAgreement\nsubjectAltName=DNS:${FLEET_HOSTNAME}")
+
+rm -f tls.csr ca.srl
+```
+
+### 5.3 Generate the Tesla Command Key Pair
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out private-key.pem
+openssl ec -in private-key.pem -pubout -out public-key.pem
+```
+
+### 5.4 Get the Environment Variable Values
+
+```bash
+echo "LETS_ENCRYPT_CERTIFICATE=$(cat ca.crt | base64 | tr -d '\n')"
+echo "TESLA_PUBLIC_KEY_BASE64=$(cat public-key.pem | base64 | tr -d '\n')"
+```
+
+Save these two values — you'll need them in your `.env` file.
+
+> **Important**: Register `public-key.pem` at [developer.tesla.com](https://developer.tesla.com) and serve it at `https://yourdomain.com/.well-known/appspecific/com.tesla.3p.public-key.pem` (the webapp proxies this path automatically).
+
+### 5.5 Certificate Files Summary
 
 | File | Purpose |
 |------|---------|
-| `ca.key` | Fleet Telemetry CA private key (keep secret) |
-| `ca.crt` | Fleet Telemetry CA certificate (needed by API and fleet-telemetry) |
+| `ca.key` | Fleet Telemetry CA private key (**keep secret**) |
+| `ca.crt` | Fleet Telemetry CA certificate (used by API and fleet-telemetry) |
 | `tls.key` | Fleet Telemetry server private key |
 | `tls.crt` | Fleet Telemetry server certificate (signed by CA) |
-| `private-key.pem` | Tesla vehicle command private key (keep secret) |
-| `public-key.pem` | Tesla vehicle command public key (publish at well-known URL) |
+| `private-key.pem` | Tesla vehicle command private key (**keep secret**) |
+| `public-key.pem` | Tesla vehicle command public key (register at Tesla + well-known URL) |
 
-The script also outputs the base64-encoded values for:
-- `LETS_ENCRYPT_CERTIFICATE` (base64 of `ca.crt`)
-- `TESLA_PUBLIC_KEY_BASE64` (base64 of `public-key.pem`)
-
-**Save these values** — you'll need them in your `.env` file.
-
-### 5.1 Copy Certificates to Your Server
+### 5.6 Copy Certificates to Your Server
 
 ```bash
 # Example for Synology NAS
