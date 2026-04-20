@@ -37,8 +37,8 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
       withChatId((ctx, chatId) => this.handleOffensiveButton(ctx, chatId)),
     );
 
-    this.botService.registerAction(/^offensive:select:(.+)$/, withChatId((ctx, chatId) => this.handleVehicleSelection(ctx, chatId)));
-    this.botService.registerAction(/^offensive:set:(.+):(.+)$/, withChatId((ctx, chatId) => this.handleSetResponse(ctx, chatId)));
+    this.botService.registerAction(/^o_sl:(.+)$/, withChatId((ctx, chatId) => this.handleVehicleSelection(ctx, chatId)));
+    this.botService.registerAction(/^o_s:(.+):(.+)$/, withChatId((ctx, chatId) => this.handleSetResponse(ctx, chatId)));
   }
 
   private async handleOffensiveButton(ctx: Context, chatId: string): Promise<void> {

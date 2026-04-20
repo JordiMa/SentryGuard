@@ -51,9 +51,10 @@ export class TelegramKeyboardBuilderService {
   }
 
   buildVehicleSelectionKeyboard(vehicles: Vehicle[], prefix: string): TelegramMessageOptions {
+    const shortPrefix = prefix === 'offensive' ? 'o_sl' : prefix;
     const rows = vehicles.map((vehicle) => [{
       text: vehicle.display_name || vehicle.vin,
-      callback_data: `${prefix}:select:${vehicle.id}`,
+      callback_data: `${shortPrefix}:${vehicle.id}`,
     }]);
 
     return {
@@ -73,7 +74,7 @@ export class TelegramKeyboardBuilderService {
 
     const keyboard = options.map(({ key, label }) => {
       const prefix = key === currentResponse ? '✅ ' : '';
-      return [{ text: `${prefix}${label}`, callback_data: `offensive:set:${vehicleId}:${key}` }];
+      return [{ text: `${prefix}${label}`, callback_data: `o_s:${vehicleId}:${key}` }];
     });
 
     return {

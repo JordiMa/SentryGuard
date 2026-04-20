@@ -74,11 +74,11 @@ describe('The TelegramOffensiveResponseService class', () => {
     mockBotService.registerHears.mockImplementation((_, handler) => { hearsHandler = handler; });
     mockBotService.registerAction.mockImplementation((trigger, handler) => {
       if (typeof trigger === 'string') {
-        if (trigger === 'offensive:select:vehicle-1') selectHandler = handler;
+        if (trigger === 'o_sl:vehicle-1') selectHandler = handler;
       } else {
         const pattern = trigger.toString();
-        if (pattern.includes('offensive:select')) selectHandler = handler;
-        else if (pattern.includes('offensive:set')) setHandler = handler;
+        if (pattern.includes('o_sl')) selectHandler = handler;
+        else if (pattern.includes('o_s:')) setHandler = handler;
       }
     });
     mockContextService.getUserLanguageFromChatId.mockResolvedValue('en');
@@ -180,7 +180,7 @@ describe('The TelegramOffensiveResponseService class', () => {
       });
 
       it('should show response options for that vehicle', async () => {
-        const ctx = buildCtx(fakeChatId, ['offensive:select:vehicle-1', 'vehicle-1']);
+        const ctx = buildCtx(fakeChatId, ['o_sl:vehicle-1', 'vehicle-1']);
         await selectHandler(ctx);
 
         expect(mockKeyboardBuilderService.buildOffensiveResponseKeyboard).toHaveBeenCalledWith(
@@ -200,7 +200,7 @@ describe('The TelegramOffensiveResponseService class', () => {
     });
 
     it('should update the vehicle offensive_response and confirm', async () => {
-      const ctx = buildCtx(fakeChatId, ['offensive:set:vehicle-1:FLASH', 'vehicle-1', 'FLASH']);
+      const ctx = buildCtx(fakeChatId, ['o_s:vehicle-1:FLASH', 'vehicle-1', 'FLASH']);
 
       await setHandler(ctx);
 

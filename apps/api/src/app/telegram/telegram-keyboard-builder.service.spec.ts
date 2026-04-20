@@ -109,10 +109,10 @@ describe('The TelegramKeyboardBuilderService class', () => {
       expect(result.keyboard).toBeDefined();
       const inlineKeyboard = result.keyboard?.inline_keyboard;
       expect(inlineKeyboard).toHaveLength(4);
-      expect(inlineKeyboard?.[0]?.[0]?.callback_data).toBe(`offensive:set:vehicle-1:${OffensiveResponse.DISABLED}`);
-      expect(inlineKeyboard?.[1]?.[0]?.callback_data).toBe(`offensive:set:vehicle-1:${OffensiveResponse.FLASH}`);
-      expect(inlineKeyboard?.[2]?.[0]?.callback_data).toBe(`offensive:set:vehicle-1:${OffensiveResponse.HONK}`);
-      expect(inlineKeyboard?.[3]?.[0]?.callback_data).toBe(`offensive:set:vehicle-1:${OffensiveResponse.FLASH_AND_HONK}`);
+      expect(inlineKeyboard?.[0]?.[0]?.callback_data).toBe(`o_s:vehicle-1:${OffensiveResponse.DISABLED}`);
+      expect(inlineKeyboard?.[1]?.[0]?.callback_data).toBe(`o_s:vehicle-1:${OffensiveResponse.FLASH}`);
+      expect(inlineKeyboard?.[2]?.[0]?.callback_data).toBe(`o_s:vehicle-1:${OffensiveResponse.HONK}`);
+      expect(inlineKeyboard?.[3]?.[0]?.callback_data).toBe(`o_s:vehicle-1:${OffensiveResponse.FLASH_AND_HONK}`);
     });
 
     it('should prefix the current response with checkmark', () => {
