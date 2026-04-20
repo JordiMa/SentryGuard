@@ -16,7 +16,7 @@ RUN cd apps/api && \
     cp dist-migrations/migrations/*.js dist/migrations/
 
 WORKDIR /app/apps/api/dist
-RUN yarn install --immutable && yarn cache clean
+RUN yarn install && yarn cache clean
 
 FROM node:20-alpine AS runner
 RUN apk add --no-cache tini
