@@ -1,18 +1,18 @@
 #!/bin/sh
 set -e
 
-HOST="${DATABASE_HOST:-postgres}"
-PORT="${DATABASE_PORT:-5432}"
+DB_HOST="${DATABASE_HOST:-postgres}"
+DB_PORT="${DATABASE_PORT:-5432}"
 MAX_ATTEMPTS=30
 ATTEMPT_INTERVAL=2
 
-echo "Waiting for PostgreSQL at ${HOST}:${PORT}..."
+echo "Waiting for PostgreSQL at ${DB_HOST}:${DB_PORT}..."
 
 attempt=1
 while [ $attempt -le $MAX_ATTEMPTS ]; do
   if node -e " \
     const net = require('net'); \
-    const client = net.createConnection(${PORT}, '${HOST}', () => { \
+    const client = net.createConnection(${DB_PORT}, '${DB_HOST}', () => { \
       client.end(); \
       process.exit(0); \
     }); \
