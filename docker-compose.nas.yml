@@ -99,6 +99,7 @@ vehicle-command:
     image: tesla/vehicle-command:latest
     container_name: sentryguard-vehicle-command
     restart: unless-stopped
+    user: root
     volumes:
       - ${SG_DATA_PATH:-.}/fleet-telemetry/certs:/config:ro
     command: >
