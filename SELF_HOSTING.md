@@ -285,6 +285,9 @@ TESLA_PUBLIC_KEY_BASE64=PASTE_BASE64_HERE
 # Webapp (MUST be set at build time, see GitHub Actions)
 WEBAPP_URL=https://yourdomain.com
 
+# CORS — add any additional allowed origins (comma-separated)
+CORS_ALLOWED_ORIGINS=https://yourdomain.com,https://api.yourdomain.com
+
 # ===== OPTIONAL =====
 
 # Data path on the host (default: current directory)
@@ -412,6 +415,7 @@ docker exec sentryguard-kafka kafka-topics --bootstrap-server localhost:9092 \
 | `LETS_ENCRYPT_CERTIFICATE` | Base64 of fleet-telemetry CA cert | Output from `generate-certs.sh` |
 | `TESLA_PUBLIC_KEY_BASE64` | Base64 of Tesla public key | Output from `generate-certs.sh` |
 | `WEBAPP_URL` | Webapp public URL (for CORS + redirects) | `https://yourdomain.com` |
+| `CORS_ALLOWED_ORIGINS` | Additional CORS origins (comma-separated) | `https://yourdomain.com,https://api.yourdomain.com` |
 
 ### Build-Time Variables (in GitHub Actions)
 

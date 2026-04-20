@@ -85,23 +85,23 @@ services:
       kafka:
         condition: service_healthy
     volumes:
-      - ${SG_DATA_PATH:-.}/fleet-telemetry/config.json:/etc/fleet-telemetry/config.json:ro
-      - ${SG_DATA_PATH:-.}/fleet-telemetry/certs:/etc/fleet-telemetry/certs:ro
+      - /volume1/docker/sentryguard/fleet-telemetry/config.json:/etc/fleet-telemetry/config.json:ro
+      - /volume1/docker/sentryguard/fleet-telemetry/certs:/etc/fleet-telemetry/certs:ro
     command: ["/fleet-telemetry", "-config=/etc/fleet-telemetry/config.json"]
     ports:
-      - "${FLEET_TELEMETRY_PORT:-11111}:443"
+      - "${TESLA_FLEET_TELEMETRY_SERVER_PORT:-11111}:443"
     environment:
       SUPPRESS_TLS_HANDSHAKE_ERROR_LOGGING: "true"
     networks:
       - sentryguard
 
-vehicle-command:
+  vehicle-command:
     image: tesla/vehicle-command:latest
     container_name: sentryguard-vehicle-command
     restart: unless-stopped
     user: root
     volumes:
-      - ${SG_DATA_PATH:-.}/fleet-telemetry/certs:/config:ro
+      - /volume1/docker/sentryguard/fleet-telemetry/certs:/config:ro
     command: >
       -tls-key /config/tls.key
       -cert /config/tls.crt
@@ -126,7 +126,7 @@ vehicle-command:
     environment:
       NODE_ENV: production
       PORT: 3001
-      WEBAPP_URL: ${WEBAPP_URL:-https://sentryguard.jordimarzo.fr}
+      WEBAPP_URL: ${WEBAPP_URL:-http://localhost:3020}
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
       DATABASE_USER: ${DATABASE_USER:-sentryguard}
@@ -154,13 +154,14 @@ vehicle-command:
       TESLA_PUBLIC_KEY_BASE64: ${TESLA_PUBLIC_KEY_BASE64:-}
       KAFKA_BROKERS: kafka:29092
       KAFKA_TOPIC: ${KAFKA_TOPIC:-FleetTelemetry_V}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${API_PORT:-3021}:3001"
     networks:
       - sentryguard
 
-webapp:
+  webapp:
     image: ghcr.io/jordima/sentryguard-webapp:feat-offensive-response
     container_name: sentryguard-webapp
     restart: unless-stopped
