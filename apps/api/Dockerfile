@@ -15,9 +15,6 @@ RUN cd apps/api && \
     mkdir -p dist/migrations && \
     cp dist-migrations/migrations/*.js dist/migrations/
 
-WORKDIR /app/apps/api/dist
-RUN yarn install && yarn cache clean
-
 FROM node:20-alpine AS runner
 RUN apk add --no-cache tini
 WORKDIR /app
@@ -26,6 +23,8 @@ ENV NODE_ENV=production
 COPY --from=builder /app/apps/api/dist .
 COPY --from=builder /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+RUN yarn install --frozen-lockfile && yarn cache clean
 
 EXPOSE 3001
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
