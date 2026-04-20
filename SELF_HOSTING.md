@@ -244,63 +244,13 @@ scp -r fleet-telemetry/ admin@your-server:/volume1/docker/sentryguard/fleet-tele
 
 ### 6.1 Create the `.env` File
 
-Create `/volume1/docker/sentryguard/.env` (or equivalent path on your server):
+Copy the example file and fill in your values:
 
-```env
-# ===== REQUIRED =====
-
-# Database
-DATABASE_USER=sentryguard
-DATABASE_PASSWORD=CHANGE_ME_to_a_strong_password
-DATABASE_NAME=sentryguard
-
-# Security (min 32 chars each)
-ENCRYPTION_KEY=CHANGE_ME_to_a_random_32_char_string
-JWT_SECRET=CHANGE_ME_to_another_random_32_char_string
-JWT_OAUTH_STATE_SECRET=CHANGE_ME_to_another_random_32_char_string
-
-# Telegram
-TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN
-TELEGRAM_MODE=webhook
-TELEGRAM_WEBHOOK_BASE=https://api.yourdomain.com
-TELEGRAM_WEBHOOK_SECRET_PATH=a_random_20_plus_char_path_segment
-TELEGRAM_WEBHOOK_SECRET_TOKEN=a_random_24_plus_char_secret
-
-# Tesla OAuth
-TESLA_CLIENT_ID=YOUR_TESLA_CLIENT_ID
-TESLA_CLIENT_SECRET=YOUR_TESLA_CLIENT_SECRET
-TESLA_AUDIENCE=https://fleet-api.prd.eu.vn.cloud.tesla.com
-TESLA_REDIRECT_URI=https://api.yourdomain.com/callback/auth
-
-# Fleet Telemetry
-TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME=fleet-telemetry.yourdomain.com
-TESLA_FLEET_TELEMETRY_SERVER_PORT=11111
-
-# CA Certificate (base64 of ca.crt - output from generate-certs.sh)
-LETS_ENCRYPT_CERTIFICATE=PASTE_BASE64_HERE
-
-# Tesla Public Key (base64 of public-key.pem - output from generate-certs.sh)
-TESLA_PUBLIC_KEY_BASE64=PASTE_BASE64_HERE
-
-# Webapp (MUST be set at build time, see GitHub Actions)
-WEBAPP_URL=https://yourdomain.com
-
-# CORS — add any additional allowed origins (comma-separated)
-CORS_ALLOWED_ORIGINS=https://yourdomain.com,https://api.yourdomain.com
-
-# ===== OPTIONAL =====
-
-# Data path on the host (default: current directory)
-SG_DATA_PATH=/volume1/docker/sentryguard
-
-# Host port mappings
-API_PORT=3021
-WEBAPP_PORT=3020
-FLEET_TELEMETRY_PORT=11111
-
-# Logging
-LOG_LEVEL=info
+```bash
+cp apps/api/.env.selfhost.example /volume1/docker/sentryguard/.env
 ```
+
+Edit `/volume1/docker/sentryguard/.env` — all variables marked `REQUIRED` must be set, docker-compose will fail if any are missing.
 
 ### 6.2 Deploy
 
@@ -401,6 +351,7 @@ docker exec sentryguard-kafka kafka-topics --bootstrap-server localhost:9092 \
 
 | Variable | Description | Example |
 |----------|-------------|---------|
+| `DATABASE_PASSWORD` | PostgreSQL password (generate with `openssl rand -base64 24`) | Random string |
 | `ENCRYPTION_KEY` | Token encryption key (min 32 chars) | Random 32+ char string |
 | `JWT_SECRET` | JWT signing secret (min 32 chars) | Random 32+ char string |
 | `JWT_OAUTH_STATE_SECRET` | OAuth state signing secret (min 32 chars) | Random 32+ char string |
@@ -416,6 +367,7 @@ docker exec sentryguard-kafka kafka-topics --bootstrap-server localhost:9092 \
 | `TESLA_PUBLIC_KEY_BASE64` | Base64 of Tesla public key | Output from `generate-certs.sh` |
 | `WEBAPP_URL` | Webapp public URL (for CORS + redirects) | `https://yourdomain.com` |
 | `CORS_ALLOWED_ORIGINS` | Additional CORS origins (comma-separated) | `https://yourdomain.com,https://api.yourdomain.com` |
+| `NEXT_PUBLIC_API_URL` | API URL for webapp client-side calls (build-time) | `https://api.yourdomain.com` |
 
 ### Build-Time Variables (GitHub Actions)
 
@@ -447,7 +399,6 @@ These variables are used by the GitHub Actions workflow (`.github/workflows/dock
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_USER` | `sentryguard` | PostgreSQL user |
-| `DATABASE_PASSWORD` | `sentryguard` | PostgreSQL password |
 | `DATABASE_NAME` | `sentryguard` | PostgreSQL database name |
 | `DATABASE_SSL` | `false` | Enable SSL for DB connection |
 | `DATABASE_RUN_MIGRATIONS` | `true` | Run migrations on startup |
@@ -455,7 +406,6 @@ These variables are used by the GitHub Actions workflow (`.github/workflows/dock
 | `TESLA_FLEET_TELEMETRY_SERVER_PORT` | `11111` | Fleet telemetry external port |
 | `KAFKA_TOPIC` | `FleetTelemetry_V` | Kafka topic for telemetry |
 | `LOG_LEVEL` | `info` | Logging level (`debug`, `info`, `warn`, `error`) |
-| `SG_DATA_PATH` | `.` | Path to config/certs on host |
 | `API_PORT` | `3021` | Host port for API |
 | `WEBAPP_PORT` | `3020` | Host port for webapp |
 | `FLEET_TELEMETRY_PORT` | `11111` | Host port for fleet-telemetry |

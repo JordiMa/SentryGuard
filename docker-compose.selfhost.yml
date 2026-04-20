@@ -1,17 +1,15 @@
 # SentryGuard - Self-Hosting Deployment (Docker Compose)
 #
-# Portainer Setup:
-#   1. Create folder on server: /volume1/docker/sentryguard/ (or your preferred path)
-#   2. Copy this file + fleet-telemetry/ folder there
-#   3. Run ./scripts/generate-certs.sh on your machine, then copy fleet-telemetry/certs/ to server
-#   4. In Portainer: Stacks → Add Stack → Upload this file → Add env vars
+# Prerequisites:
+#   1. Create a folder on your server (e.g. /volume1/docker/sentryguard/)
+#   2. Copy fleet-telemetry/ folder there
+#   3. Generate certificates (see SELF_HOSTING.md)
+#   4. Create .env file (see SELF_HOSTING.md)
 #
-# CLI Setup:
-#   1. Run ./scripts/generate-certs.sh
-#   2. Create .env file (see SELF_HOSTING.md for reference)
-#   3. docker compose -f docker-compose.selfhost.yml --env-file .env up -d
+# Deploy:
+#   docker compose -f docker-compose.selfhost.yml --env-file .env up -d
 #
-# To update images:
+# Update:
 #   docker compose -f docker-compose.selfhost.yml pull && docker compose -f docker-compose.selfhost.yml up -d
 
 services:
@@ -126,7 +124,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      WEBAPP_URL: ${WEBAPP_URL:-http://localhost:3020}
+      WEBAPP_URL: ${WEBAPP_URL:-http://localhost:3000}
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
       DATABASE_USER: ${DATABASE_USER:-sentryguard}
@@ -141,17 +139,17 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
       TELEGRAM_MODE: ${TELEGRAM_MODE:-webhook}
       TELEGRAM_WEBHOOK_BASE: ${TELEGRAM_WEBHOOK_BASE:?TELEGRAM_WEBHOOK_BASE is required}
-      TELEGRAM_WEBHOOK_SECRET_PATH: ${TELEGRAM_WEBHOOK_SECRET_PATH:-}
-      TELEGRAM_WEBHOOK_SECRET_TOKEN: ${TELEGRAM_WEBHOOK_SECRET_TOKEN:-}
-      TESLA_CLIENT_ID: ${TESLA_CLIENT_ID:-}
-      TESLA_CLIENT_SECRET: ${TESLA_CLIENT_SECRET:-}
+      TELEGRAM_WEBHOOK_SECRET_PATH: ${TELEGRAM_WEBHOOK_SECRET_PATH:?TELEGRAM_WEBHOOK_SECRET_PATH is required}
+      TELEGRAM_WEBHOOK_SECRET_TOKEN: ${TELEGRAM_WEBHOOK_SECRET_TOKEN:?TELEGRAM_WEBHOOK_SECRET_TOKEN is required}
+      TESLA_CLIENT_ID: ${TESLA_CLIENT_ID:?TESLA_CLIENT_ID is required}
+      TESLA_CLIENT_SECRET: ${TESLA_CLIENT_SECRET:?TESLA_CLIENT_SECRET is required}
       TESLA_AUDIENCE: ${TESLA_AUDIENCE:-https://fleet-api.prd.eu.vn.cloud.tesla.com}
-      TESLA_REDIRECT_URI: ${TESLA_REDIRECT_URI:-}
+      TESLA_REDIRECT_URI: ${TESLA_REDIRECT_URI:?TESLA_REDIRECT_URI is required}
       TESLA_API_BASE_URL: https://vehicle-command:443
-      TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME: ${TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME:-}
+      TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME: ${TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME:?TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME is required}
       TESLA_FLEET_TELEMETRY_SERVER_PORT: ${TESLA_FLEET_TELEMETRY_SERVER_PORT:-11111}
-      LETS_ENCRYPT_CERTIFICATE: ${LETS_ENCRYPT_CERTIFICATE:-}
-      TESLA_PUBLIC_KEY_BASE64: ${TESLA_PUBLIC_KEY_BASE64:-}
+      LETS_ENCRYPT_CERTIFICATE: ${LETS_ENCRYPT_CERTIFICATE:?LETS_ENCRYPT_CERTIFICATE is required}
+      TESLA_PUBLIC_KEY_BASE64: ${TESLA_PUBLIC_KEY_BASE64:?TESLA_PUBLIC_KEY_BASE64 is required}
       KAFKA_BROKERS: kafka:29092
       KAFKA_TOPIC: ${KAFKA_TOPIC:-FleetTelemetry_V}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
@@ -169,7 +167,7 @@ services:
       api:
         condition: service_started
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3021}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
     ports:
       - "${WEBAPP_PORT:-3020}:3000"
     networks:
