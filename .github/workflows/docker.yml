@@ -2,9 +2,6 @@ name: Build & Push Docker Images
 
 on:
   push:
-    branches:
-      - main
-      - feat/offensive-response
   workflow_dispatch:
 
 env:
@@ -51,7 +48,7 @@ jobs:
           tags: |
             type=sha,prefix=
             type=ref,event=branch
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
