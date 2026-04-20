@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN yarn install --frozen-lockfile
+RUN yarn install --immutable
 
 RUN npx nx build api
 RUN npx nx copy-workspace-modules api
@@ -16,7 +16,7 @@ RUN cd apps/api && \
     cp dist-migrations/migrations/*.js dist/migrations/
 
 WORKDIR /app/apps/api/dist
-RUN yarn install --frozen-lockfile && yarn cache clean
+RUN yarn install --immutable && yarn cache clean
 
 FROM node:20-alpine AS runner
 RUN apk add --no-cache tini

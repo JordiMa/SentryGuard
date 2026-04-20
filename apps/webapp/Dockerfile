@@ -7,7 +7,7 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 COPY . .
 
-RUN yarn install --frozen-lockfile
+RUN yarn install --immutable
 
 RUN npx nx build webapp
 
