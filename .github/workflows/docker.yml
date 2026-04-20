@@ -63,5 +63,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             NEXT_PUBLIC_API_URL=https://api-sentryguard.jordimarzo.fr
+            NEXT_PUBLIC_VIRTUAL_KEY_PAIRING_URL=https://tesla.com/_ak/sentryguard.jordimarzo.fr
           cache-from: type=gha
           cache-to: type=gha,mode=max
