@@ -19,6 +19,7 @@ async function bootstrap() {
       webappUrl,
       'http://localhost:4200',
       'http://localhost:3000',
+      'https://sentryguard.jordimarzo.fr',
       ...additionalOrigins,
     ])
   );
