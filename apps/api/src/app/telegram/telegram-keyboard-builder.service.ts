@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import i18n from '../../i18n';
+import { Vehicle } from '../../entities/vehicle.entity';
+import { OffensiveResponse } from '../alerts/enums/offensive-response.enum';
 import { TelegramMessageOptions } from './telegram.types';
 
 @Injectable()
 export class TelegramKeyboardBuilderService {
+
   buildSentryAlertKeyboard(
     userId: string,
     userLanguage: 'en' | 'fr'
@@ -39,8 +42,43 @@ export class TelegramKeyboardBuilderService {
         keyboard: [[
           { text: i18n.t('menuButtonStatus', { lng }) },
           { text: i18n.t(muteButtonKey, { lng }) },
+        ], [
+          { text: i18n.t('menuButtonOffensive', { lng }) },
         ]],
         resize_keyboard: true,
+      },
+    };
+  }
+
+  buildVehicleSelectionKeyboard(vehicles: Vehicle[], prefix: string): TelegramMessageOptions {
+    const rows = vehicles.map((vehicle) => [{
+      text: vehicle.display_name || vehicle.vin,
+      callback_data: `${prefix}:select:${vehicle.id}`,
+    }]);
+
+    return {
+      keyboard: {
+        inline_keyboard: rows,
+      },
+    };
+  }
+
+  buildOffensiveResponseKeyboard(vehicleId: string, currentResponse: OffensiveResponse, lng: 'en' | 'fr'): TelegramMessageOptions {
+    const options: Array<{ key: OffensiveResponse; label: string }> = [
+      { key: OffensiveResponse.DISABLED, label: i18n.t('offensiveDisabled', { lng }) },
+      { key: OffensiveResponse.FLASH, label: i18n.t('offensiveFlash', { lng }) },
+      { key: OffensiveResponse.HONK, label: i18n.t('offensiveHonk', { lng }) },
+      { key: OffensiveResponse.FLASH_AND_HONK, label: i18n.t('offensiveFlashAndHonk', { lng }) },
+    ];
+
+    const keyboard = options.map(({ key, label }) => {
+      const prefix = key === currentResponse ? '✅ ' : '';
+      return [{ text: `${prefix}${label}`, callback_data: `offensive:set:${vehicleId}:${key}` }];
+    });
+
+    return {
+      keyboard: {
+        inline_keyboard: keyboard,
       },
     };
   }
