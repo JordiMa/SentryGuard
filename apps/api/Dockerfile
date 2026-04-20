@@ -15,15 +15,13 @@ RUN cd apps/api && \
     mkdir -p dist/migrations && \
     cp dist-migrations/migrations/*.js dist/migrations/
 
-WORKDIR /app/apps/api/dist
-RUN npm install --omit=dev && npm cache clean --force
-
 FROM node:20-alpine AS runner
 RUN apk add --no-cache tini
 WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/node_modules/reflect-metadata ./dist/node_modules/reflect-metadata
 COPY --from=builder /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
