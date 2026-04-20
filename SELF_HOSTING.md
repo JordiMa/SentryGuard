@@ -8,94 +8,114 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
 
 1. [Architecture Overview](#1-architecture-overview)
 2. [Prerequisites](#2-prerequisites)
-3. [DNS & Cloudflare Setup](#3-dns--cloudflare-setup)
+3. [DNS & Reverse Proxy Setup](#3-dns--reverse-proxy-setup)
 4. [Tesla Developer Setup](#4-tesla-developer-setup)
 5. [Generate Certificates](#5-generate-certificates)
 6. [Deploy with Docker Compose](#6-deploy-with-docker-compose)
-7. [Nginx Proxy Manager Setup](#7-nginx-proxy-manager-setup)
-8. [Post-Deployment Configuration](#8-post-deployment-configuration)
-9. [Environment Variables Reference](#9-environment-variables-reference)
-10. [Troubleshooting](#10-troubleshooting)
+7. [Post-Deployment Configuration](#7-post-deployment-configuration)
+8. [Environment Variables Reference](#8-environment-variables-reference)
+9. [Troubleshooting](#9-troubleshooting)
 
 ---
 
 ## 1. Architecture Overview
 
 ```
-                    ┌─────────────┐
-                    │  Cloudflare │
-                    │    (DNS)    │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-    ┌─────────▼──┐  ┌──────▼─────┐  ┌──▼──────────┐
-    │  Webapp    │  │    API     │  │ Fleet        │
-    │  :3000     │  │   :3001    │  │ Telemetry    │
-    │ (Next.js) │  │  (NestJS)  │  │   :443       │
-    └────────────┘  └──────┬─────┘  └──────┬──────┘
-                           │               │
-                    ┌──────┼──────┐        │
-                    │      │      │        │
-              ┌─────▼┐ ┌───▼──┐ ┌▼─────┐ │
-              │Postgr│ │Kafka │ │Zookpr│ │
-              │  es   │ │      │ │      │ │
-              │:5432  │ │:29092│ │:2181 │ │
-              └───────┘ └──────┘ └──────┘ │
-                                          │
-                    ┌─────────────────────┘
-                    │  vehicle-command :443
-                    │  (Tesla proxy)
-                    └─────────────────────
+              ┌─────────────┐
+              │    Users     │
+              └──────┬──────┘
+                     │ HTTPS
+              ┌──────▼──────┐
+              │ Reverse Proxy│
+              │ (NPM/Caddy/  │
+              │  Nginx/Traefik)│
+              └──┬──────┬──┘
+                 │      │
+        ┌────────▼┐  ┌─▼──────────┐
+        │ Webapp   │  │    API     │
+        │ :3000    │  │   :3001    │
+        │(Next.js) │  │ (NestJS)  │
+        └─────────┘  └──────┬─────┘
+                            │
+                     ┌──────┼──────┐
+                     │      │      │
+               ┌─────▼┐ ┌───▼──┐ ┌▼──────┐
+               │Postgr│ │Kafka │ │Zookpr  │
+               │  es   │ │      │ │        │
+               │:5432  │ │:29092│ │:2181   │
+               └───────┘ └──────┘ └────────┘
+
+       ┌──────────────────────────────────┐
+       │  fleet-telemetry :443  ◄── Tesla │
+       │  vehicle-command :443  ──► Tesla │
+       └──────────────────────────────────┘
+               (on sentryguard network)
 ```
 
 **Services:**
-- **webapp**: Next.js frontend
-- **api**: NestJS backend
+- **webapp**: Next.js frontend (internal port 3000)
+- **api**: NestJS backend (internal port 3001)
 - **postgres**: PostgreSQL database
 - **kafka + zookeeper**: Message broker for telemetry data
-- **fleet-telemetry**: Tesla Fleet Telemetry server (receives vehicle data)
-- **vehicle-command**: Tesla Vehicle Command proxy (sends commands to vehicles)
+- **fleet-telemetry**: Tesla Fleet Telemetry server (receives vehicle data, port 443)
+- **vehicle-command**: Tesla Vehicle Command proxy (sends commands to vehicles, port 443)
 
-**Docker network**: All services communicate on a `sentryguard` bridge network. Only API, webapp, and fleet-telemetry ports are exposed to the host.
+**Docker network**: All services communicate on a `sentryguard` bridge network. Only API and webapp are exposed through the reverse proxy. Fleet-telemetry needs a public port for Tesla to connect.
 
 ---
 
 ## 2. Prerequisites
 
-- A server (Synology NAS, VPS, etc.) with Docker and Docker Compose
+- A server with Docker and Docker Compose (Synology NAS, VPS, Raspberry Pi, etc.)
 - A domain name (e.g., `yourdomain.com`)
-- A Cloudflare account (free tier works)
+- SSL certificates for your reverse proxy (Let's Encrypt, Cloudflare Origin, or self-signed)
 - A Telegram bot token (from [@BotFather](https://t.me/BotFather))
 - A Tesla Developer account (from [developer.tesla.com](https://developer.tesla.com))
+- Port 11111 open on your firewall/router (for fleet-telemetry)
 
 ---
 
-## 3. DNS & Cloudflare Setup
+## 3. DNS & Reverse Proxy Setup
 
-### 3.1 Create DNS Records
+### 3.1 DNS Records
 
-In your Cloudflare DNS dashboard, create these records:
+Create these DNS records pointing to your server:
 
-| Record | Type | Content | Proxy |
-|--------|------|---------|-------|
-| `yourdomain.com` | A | Your server IP | Proxied (orange cloud) |
-| `api.yourdomain.com` | A | Your server IP | Proxied (orange cloud) |
-| `fleet-telemetry.yourdomain.com` | A | Your server IP | DNS only (grey cloud) |
+| Record | Type | Target |
+|--------|------|--------|
+| `yourdomain.com` | A | Your server IP |
+| `api.yourdomain.com` | A | Your server IP |
+| `fleet-telemetry.yourdomain.com` | A | Your server IP |
 
-> **Important**: The fleet-telemetry subdomain MUST be set to "DNS only" (grey cloud), not proxied through Cloudflare. Cloudflare's proxy doesn't handle mTLS/TLS connections on custom ports.
+> **Important**: If you use Cloudflare, set `fleet-telemetry.yourdomain.com` to **DNS only** (grey cloud). Cloudflare's proxy does not handle TLS connections on custom ports.
 
-### 3.2 Cloudflare SSL Settings
+### 3.2 Reverse Proxy
 
-In Cloudflare → SSL/TLS → Overview:
-- Set encryption mode to **Full (strict)**
+You need a reverse proxy to terminate SSL for the webapp and API. Any of these will work:
+- **Nginx Proxy Manager** (easiest for NAS users)
+- **Caddy** (automatic HTTPS with Let's Encrypt)
+- **Nginx** (manual configuration)
+- **Traefik** (Docker-native)
 
-### 3.3 Generate Cloudflare Origin Certificates
+Configure three proxy hosts:
 
-In Cloudflare → SSL/TLS → Origin Server → Create Certificate:
-1. Generate a certificate for `*.yourdomain.com` and `yourdomain.com`
-2. Save the **Origin Certificate** (PEM) and **Private Key**
-3. You'll need these for Nginx Proxy Manager
+| Subdomain | Upstream | Port | Notes |
+|-----------|-----------|------|-------|
+| `yourdomain.com` | `sentryguard-webapp` (or host:3020) | 3000 | Webapp |
+| `api.yourdomain.com` | `sentryguard-api` (or host:3021) | 3001 | API |
+| `fleet-telemetry.yourdomain.com` | Direct (port 11111) | 443 | No reverse proxy — Tesla connects directly |
+
+> **Fleet telemetry**: Tesla connects to port 11111 with mutual TLS. Do NOT proxy this through your reverse proxy — expose port 11111 directly on your firewall/router and map it to the `sentryguard-fleet-telemetry` container.
+
+### 3.3 SSL Certificates
+
+For the webapp and API:
+- Use Let's Encrypt (free, auto-renewing) or any valid SSL certificate
+- If behind Cloudflare, use Cloudflare Origin certificates with "Full (strict)" SSL mode
+
+For fleet-telemetry:
+- The `generate-certs.sh` script generates self-signed CA + server certificates
+- These are used internally between Tesla and your server — no public CA needed
 
 ---
 
@@ -144,6 +164,8 @@ The webapp already proxies this path to the API via `next.config.js`. The API se
 Run this script on your local machine (requires `openssl`):
 
 ```bash
+# Optionally override the fleet-telemetry hostname:
+# FLEET_HOSTNAME=fleet-telemetry.yourdomain.com ./scripts/generate-certs.sh
 ./scripts/generate-certs.sh
 ```
 
@@ -168,7 +190,7 @@ The script also outputs the base64-encoded values for:
 
 ```bash
 # Example for Synology NAS
-scp -r fleet-telemetry/ admin@your-nas:/volume1/docker/sentryguard/fleet-telemetry/
+scp -r fleet-telemetry/ admin@your-server:/volume1/docker/sentryguard/fleet-telemetry/
 ```
 
 ---
@@ -177,7 +199,7 @@ scp -r fleet-telemetry/ admin@your-nas:/volume1/docker/sentryguard/fleet-telemet
 
 ### 6.1 Create the `.env` File
 
-Create `/volume1/docker/sentryguard/.env` (or equivalent on your server):
+Create `/volume1/docker/sentryguard/.env` (or equivalent path on your server):
 
 ```env
 # ===== REQUIRED =====
@@ -217,7 +239,6 @@ TESLA_PUBLIC_KEY_BASE64=PASTE_BASE64_HERE
 
 # Webapp (MUST be set at build time, see GitHub Actions)
 WEBAPP_URL=https://yourdomain.com
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com
 
 # ===== OPTIONAL =====
 
@@ -263,92 +284,9 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:3020
 
 ---
 
-## 7. Nginx Proxy Manager Setup
+## 7. Post-Deployment Configuration
 
-### 7.1 Install Nginx Proxy Manager
-
-If not already installed on your NAS:
-
-```bash
-docker run -d \
-  --name npm \
-  --restart unless-stopped \
-  -p 80:80 -p 443:443 -p 81:81 \
-  -v /volume1/docker/npm/data:/data \
-  -v /volume1/docker/npm/letsencrypt:/etc/letsencrypt \
-  jc21/nginx-proxy-manager
-```
-
-> **Important**: Do NOT use Let's Encrypt certificates with NPM when behind Cloudflare. Use Cloudflare Origin certificates instead.
-
-### 7.2 Create SSL Certificates in NPM
-
-1. Go to **SSL Certificates → Add SSL Certificate → Custom**
-2. Name: `Cloudflare Origin - yourdomain.com`
-3. Paste the **Certificate** (Origin Certificate PEM from Cloudflare)
-4. Paste the **Private Key** (from Cloudflare)
-5. Save
-
-### 7.3 Add Proxy Hosts
-
-#### Webapp (`yourdomain.com`)
-
-| Setting | Value |
-|---------|-------|
-| Domain | `yourdomain.com` |
-| Scheme | `http` |
-| Forward Hostname/IP | `sentryguard-webapp` (or container IP) |
-| Forward Port | `3000` |
-| Block Common Exploits | Yes |
-| Websockets Support | Yes |
-| SSL | Enable → Select `Cloudflare Origin - yourdomain.com` |
-| Force SSL | Yes |
-| HTTP/2 Support | Yes |
-| HSTS Enabled | Yes |
-
-#### API (`api.yourdomain.com`)
-
-| Setting | Value |
-|---------|-------|
-| Domain | `api.yourdomain.com` |
-| Scheme | `http` |
-| Forward Hostname/IP | `sentryguard-api` (or container IP) |
-| Forward Port | `3001` |
-| Block Common Exploits | Yes |
-| Websockets Support | Yes |
-| SSL | Enable → Select `Cloudflare Origin - yourdomain.com` |
-| Force SSL | Yes |
-| HTTP/2 Support | Yes |
-| HSTS Enabled | Yes |
-
-> **Note**: Use container names (e.g., `sentryguard-api`) as the Forward Hostname only if NPM is on the same Docker network. Otherwise, use the host IP + mapped port (e.g., `192.168.1.x:3021`).
-
-#### Fleet Telemetry (`fleet-telemetry.yourdomain.com`)
-
-For fleet telemetry, since Cloudflare doesn't proxy this (DNS only), you have two options:
-
-**Option A**: Use Cloudflare Origin certificate in NPM (if Cloudflare resolves to your server anyway)
-
-| Setting | Value |
-|---------|-------|
-| Domain | `fleet-telemetry.yourdomain.com` |
-| Scheme | `https` |
-| Forward Hostname/IP | `sentryguard-fleet-telemetry` |
-| Forward Port | `443` |
-| SSL | Enable → Select `Cloudflare Origin - yourdomain.com` |
-| Force SSL | Yes |
-
-> **Note**: Since the fleet-telemetry container already terminates TLS with its own self-signed cert, proxying through NPM with SSL requires NPM to trust the fleet-telemetry CA. This is complex. **Option B is recommended.**
-
-**Option B (Recommended)**: Direct connection — expose port 11111 on your router/firewall directly.
-
-In this case, port 11111 on your server maps directly to the fleet-telemetry container port 443 (already configured in docker-compose). No NPM proxy needed.
-
----
-
-## 8. Post-Deployment Configuration
-
-### 8.1 Virtual Key Pairing
+### 7.1 Virtual Key Pairing
 
 After logging in for the first time:
 
@@ -356,20 +294,19 @@ After logging in for the first time:
 2. This opens Tesla's website — approve the key in the Tesla app on your phone
 3. Return to SentryGuard and refresh vehicles
 
-### 8.2 Verify Fleet Telemetry
+### 7.2 Verify Fleet Telemetry
 
 From your local machine, test the fleet-telemetry endpoint:
 
 ```bash
-# Test with self-signed CA
 curl -v --cacert fleet-telemetry/certs/ca.crt \
-  --resolve fleet-telemetry.yourdomain.com:11111YOUR_SERVER_IP \
+  --resolve fleet-telemetry.yourdomain.com:11111:YOUR_SERVER_IP \
   https://fleet-telemetry.yourdomain.com:11111/
 ```
 
 You should get a TLS handshake (the connection may close quickly — that's normal, it's expecting mTLS).
 
-### 8.3 Verify Vehicle Configuration
+### 7.3 Verify Vehicle Configuration
 
 Check API logs to confirm telemetry configuration works:
 
@@ -382,17 +319,18 @@ When you enable telemetry for a vehicle, you should see:
 ✅ Telemetry configured for VIN: XXXXXXX
 ```
 
-If you see `ca is not a valid PEM`, check that `LETS_ENCRYPT_CERTIFICATE` is set correctly (base64 of `ca.crt`).
+Common errors:
 
-If you see `invalid domain`, check that `TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME` is just the hostname without `https://` or trailing slash:
-```
-✅ TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME=fleet-telemetry.yourdomain.com
-❌ TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME=https://fleet-telemetry.yourdomain.com/
-```
+- **`ca is not a valid PEM`**: `LETS_ENCRYPT_CERTIFICATE` is empty or invalid. Regenerate with `base64 < fleet-telemetry/certs/ca.crt | tr -d '\n'` and set it in `.env`.
+- **`invalid domain`**: `TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME` must be just the hostname, no `https://` and no trailing `/`:
+  ```
+  ✅ fleet-telemetry.yourdomain.com
+  ❌ https://fleet-telemetry.yourdomain.com/
+  ```
 
-### 8.4 Kafka Topic
+### 7.4 Kafka Topic
 
-The fleet-telemetry server sends vehicle data to the `FleetTelemetry_V` Kafka topic. Make sure the topic is created:
+The fleet-telemetry server sends vehicle data to the `FleetTelemetry_V` Kafka topic. Ensure it exists:
 
 ```bash
 docker exec sentryguard-kafka kafka-topics --bootstrap-server localhost:9092 --list
@@ -405,11 +343,11 @@ docker exec sentryguard-kafka kafka-topics --bootstrap-server localhost:9092 \
   --create --topic FleetTelemetry_V --partitions 1 --replication-factor 1
 ```
 
-> **Note**: `KAFKA_AUTO_CREATE_TOPICS_ENABLE=true` is set in the docker-compose, so topics should be created automatically.
+> **Note**: `KAFKA_AUTO_CREATE_TOPICS_ENABLE=true` is set in docker-compose, so topics are created automatically.
 
 ---
 
-## 9. Environment Variables Reference
+## 8. Environment Variables Reference
 
 ### Required
 
@@ -425,7 +363,7 @@ docker exec sentryguard-kafka kafka-topics --bootstrap-server localhost:9092 \
 | `TESLA_CLIENT_ID` | Tesla Developer Client ID | From developer.tesla.com |
 | `TESLA_CLIENT_SECRET` | Tesla Developer Client Secret | From developer.tesla.com |
 | `TESLA_REDIRECT_URI` | OAuth callback URL | `https://api.yourdomain.com/callback/auth` |
-| `TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME` | Fleet telemetry public hostname | `fleet-telemetry.yourdomain.com` |
+| `TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME` | Fleet telemetry hostname (no protocol) | `fleet-telemetry.yourdomain.com` |
 | `LETS_ENCRYPT_CERTIFICATE` | Base64 of fleet-telemetry CA cert | Output from `generate-certs.sh` |
 | `TESLA_PUBLIC_KEY_BASE64` | Base64 of Tesla public key | Output from `generate-certs.sh` |
 | `WEBAPP_URL` | Webapp public URL (for CORS + redirects) | `https://yourdomain.com` |
@@ -462,7 +400,7 @@ These are baked into the Docker image at build time and **cannot be changed afte
 
 ---
 
-## 10. Troubleshooting
+## 9. Troubleshooting
 
 ### API returns "ca is not a valid PEM"
 
@@ -472,7 +410,7 @@ The `LETS_ENCRYPT_CERTIFICATE` env var is empty or invalid. Regenerate:
 base64 < fleet-telemetry/certs/ca.crt | tr -d '\n'
 ```
 
-Copy the output and set it in your `.env`.
+Copy the output and set it in your `.env`, then restart the API container.
 
 ### API returns "invalid domain"
 
