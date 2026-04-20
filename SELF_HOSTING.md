@@ -31,7 +31,7 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
               │  Nginx/Traefik)│
               └──┬──────┬──────┘
                  │      │
-        ┌────────▼┐  ┌─▼──────────┐
+        ┌────────▼┐  ┌──▼─────────┐
         │ Webapp  │  │    API     │
         │ :3000   │  │   :3001    │
         │(Next.js)│  │  (NestJS)  │
@@ -39,7 +39,7 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
                             │
                      ┌──────┼──────┐
                      │      │      │
-             ┌───────▼─┐ ┌───▼──┐ ┌▼───────┐
+             ┌───────▼─┐ ┌──▼───┐ ┌▼───────┐
              │Postgres │ │Kafka │ │ Zookpr │
              │         │ │      │ │        │
              │  :5432  │ │:29092│ │ :2181  │
