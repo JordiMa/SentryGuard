@@ -125,9 +125,9 @@ vehicle-command:
     environment:
       NODE_ENV: production
       PORT: 3001
-      WEBAPP_URL: ${WEBAPP_URL:-http://localhost:3020}
+      WEBAPP_URL: ${WEBAPP_URL:-https://sentryguard.jordimarzo.fr}
       DATABASE_HOST: postgres
-      DATABASE_PORT: 5433
+      DATABASE_PORT: 5432
       DATABASE_USER: ${DATABASE_USER:-sentryguard}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-sentryguard}
       DATABASE_NAME: ${DATABASE_NAME:-sentryguard}
