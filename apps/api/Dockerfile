@@ -23,10 +23,10 @@ RUN apk add --no-cache tini
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/dist .
 COPY --from=builder /app/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 3001
 ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
-CMD ["node", "dist/main.js"]
+CMD ["node", "main.js"]
