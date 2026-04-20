@@ -53,7 +53,7 @@ jobs:
             type=ref,event=branch
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push
+- name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -62,7 +62,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            NEXT_PUBLIC_API_URL=https://api-sentryguard.jordimarzo.fr
-            NEXT_PUBLIC_VIRTUAL_KEY_PAIRING_URL=https://tesla.com/_ak/sentryguard.jordimarzo.fr
+            NEXT_PUBLIC_API_URL=${{ vars.API_URL || 'http://localhost:3001' }}
+            NEXT_PUBLIC_VIRTUAL_KEY_PAIRING_URL=${{ vars.VIRTUAL_KEY_PAIRING_URL || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
