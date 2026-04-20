@@ -62,6 +62,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            NEXT_PUBLIC_API_URL=http://api.sentryguard.jordimarzo.fr
+            NEXT_PUBLIC_API_URL=https://api.sentryguard.jordimarzo.fr
           cache-from: type=gha
           cache-to: type=gha,mode=max
