@@ -20,6 +20,14 @@ const nextConfig = {
     ],
   },
   productionBrowserSourceMaps: false,
+  async rewrites() {
+    return [
+      {
+        source: '/.well-known/appspecific/com.tesla.3p.public-key.pem',
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3021'}/.well-known/appspecific/com.tesla.3p.public-key.pem`,
+      },
+    ];
+  },
 };
 
 const plugins = [
