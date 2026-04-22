@@ -22,6 +22,7 @@ import { Vehicle } from '../../entities/vehicle.entity';
 import { AuthModule } from '../auth/auth.module';
 import { ConsentModule } from '../consent/consent.module';
 import { UserModule } from '../user/user.module';
+import { TelemetryModule } from '../telemetry/telemetry.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { UserModule } from '../user/user.module';
     AuthModule,
     ConsentModule,
     UserModule,
+    TelemetryModule,
   ],
   controllers: [TelegramController, TelegramWebhookController],
   providers: [

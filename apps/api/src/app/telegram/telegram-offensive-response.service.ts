@@ -6,6 +6,7 @@ import i18n from '../../i18n';
 import { TelegramConfig, TelegramLinkStatus } from '../../entities/telegram-config.entity';
 import { Vehicle } from '../../entities/vehicle.entity';
 import { OffensiveResponse } from '../alerts/enums/offensive-response.enum';
+import { OffensiveResponseService } from '../alerts/services/offensive-response.service';
 import { TelegramBotService } from './telegram-bot.service';
 import { TelegramKeyboardBuilderService } from './telegram-keyboard-builder.service';
 import { TelegramContextService } from './telegram-context.service';
@@ -24,6 +25,7 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
     private readonly botService: TelegramBotService,
     private readonly keyboardBuilderService: TelegramKeyboardBuilderService,
     private readonly contextService: TelegramContextService,
+    private readonly offensiveResponseService: OffensiveResponseService,
   ) {}
 
   onModuleInit(): void {
@@ -149,16 +151,7 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
     this.logger.log(`[OFFENSIVE] Test triggered via Telegram for VIN ${vehicle.vin}`);
 
     try {
-      const port = process.env.PORT || 3001;
-      const response = await fetch(`http://localhost:${port}/telemetry-config/${vehicle.vin}/test-offensive`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-User-Id': config.userId },
-      });
-
-      if (!response.ok) {
-        const body = await response.text();
-        this.logger.warn(`[OFFENSIVE] Test failed for VIN ${vehicle.vin}: ${response.status} ${body}`);
-      }
+      await this.offensiveResponseService.handleOffensiveResponse(vehicle.vin);
     } catch (error: unknown) {
       this.logger.error(`[OFFENSIVE] Test request failed for VIN ${vehicle.vin}`, error);
     }
