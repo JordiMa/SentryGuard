@@ -3,12 +3,12 @@ import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ThrottleOptions } from '../../config/throttle.config';
 
-@Controller('.well-known/appspecific/com.tesla.3p')
+@Controller('.well-known/appspecific')
 export class TeslaPublicKeyController {
   private readonly logger = new Logger(TeslaPublicKeyController.name);
 
   @Throttle(ThrottleOptions.publicSensitive())
-  @Get('public-key.pem')
+  @Get('com.tesla.3p.public-key.pem')
   @Header('Content-Type', 'application/x-pem-file')
   @Header('Content-Disposition', 'attachment; filename="com.tesla.3p.public-key.pem"')
   getPublicKey(@Res() res: Response) {
