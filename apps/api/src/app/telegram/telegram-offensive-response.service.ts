@@ -39,6 +39,7 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
 
     this.botService.registerAction(/^o_sl:(.+)$/, withChatId((ctx, chatId) => this.handleVehicleSelection(ctx, chatId)));
     this.botService.registerAction(/^o_s:(.+):(.+)$/, withChatId((ctx, chatId) => this.handleSetResponse(ctx, chatId)));
+    this.botService.registerAction(/^o_t:(.+)$/, withChatId((ctx, chatId) => this.handleTestResponse(ctx, chatId)));
   }
 
   private async handleOffensiveButton(ctx: Context, chatId: string): Promise<void> {
@@ -118,6 +119,49 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
     await ctx.answerCbQuery();
     await ctx.deleteMessage();
     await this.safeReply(ctx, i18n.t('offensiveConfirmed', { lng, vehicle: vehicleName, response: responseLabel }), this.keyboardBuilderService.buildMainMenuKeyboard(lng, config.muted_until));
+  }
+
+  private async handleTestResponse(ctx: Context, chatId: string): Promise<void> {
+    const match = (ctx as unknown as { match: string[] }).match;
+    const vehicleId = match?.[1];
+    const lng = await this.contextService.getUserLanguageFromChatId(chatId);
+    const config = await this.findLinkedConfig(chatId);
+
+    if (!config || !vehicleId) {
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    const vehicle = await this.vehicleRepository.findOne({ where: { id: vehicleId, userId: config.userId } });
+
+    if (!vehicle) {
+      await ctx.answerCbQuery();
+      return;
+    }
+
+    if (vehicle.offensive_response === OffensiveResponse.DISABLED) {
+      await ctx.answerCbQuery({ text: i18n.t('offensiveTestDisabled', { lng }), show_alert: true });
+      return;
+    }
+
+    await ctx.answerCbQuery({ text: `⚡ ${i18n.t('offensiveTestTriggered', { lng })}` });
+
+    this.logger.log(`[OFFENSIVE] Test triggered via Telegram for VIN ${vehicle.vin}`);
+
+    try {
+      const port = process.env.PORT || 3001;
+      const response = await fetch(`http://localhost:${port}/telemetry-config/${vehicle.vin}/test-offensive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Id': config.userId },
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        this.logger.warn(`[OFFENSIVE] Test failed for VIN ${vehicle.vin}: ${response.status} ${body}`);
+      }
+    } catch (error: unknown) {
+      this.logger.error(`[OFFENSIVE] Test request failed for VIN ${vehicle.vin}`, error);
+    }
   }
 
   private async showResponseOptions(ctx: Context, lng: 'en' | 'fr', vehicle: Vehicle): Promise<void> {

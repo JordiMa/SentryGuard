@@ -99,7 +99,7 @@ services:
     restart: unless-stopped
     user: root
     volumes:
-      - /volume1/docker/sentryguard/fleet-telemetry/certs:/config:ro
+      - /volume1/docker/sentryguard/fleet-telemetry/certs:/config
     command: >
       -tls-key /config/tls.key
       -cert /config/tls.crt
@@ -109,6 +109,7 @@ services:
     environment:
       TESLA_KEY_NAME: ${TESLA_KEY_NAME:-sentryguard}
       TESLA_CACHE_FILE: /tmp/.tesla-cache.json
+      TESLA_VERBOSE: "1"
     networks:
       - sentryguard
 

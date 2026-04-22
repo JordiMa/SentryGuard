@@ -27,7 +27,8 @@ export class TelemetryConfigController {
 
   constructor(
     private readonly telemetryConfigService: TelemetryConfigService,
-    private readonly sentryModeConfigService: SentryModeConfigService
+    private readonly sentryModeConfigService: SentryModeConfigService,
+    private readonly offensiveResponseService: OffensiveResponseService
   ) {}
 
   @Throttle(ThrottleOptions.authenticatedRead())
@@ -118,5 +119,17 @@ export class TelemetryConfigController {
       vin,
       body.offensive_response
     );
+  }
+
+  @Throttle(ThrottleOptions.authenticatedWrite())
+  @Post(':vin/test-offensive')
+  async testOffensiveResponse(
+    @Param('vin') vin: string,
+    @CurrentUser() user: User
+  ) {
+    const userId = user.userId;
+    this.logger.log(`🧪 Testing offensive response for VIN: ${vin} (user: ${userId})`);
+    await this.offensiveResponseService.handleOffensiveResponse(vin);
+    return { message: `Offensive response test triggered for VIN: ${vin}` };
   }
 }

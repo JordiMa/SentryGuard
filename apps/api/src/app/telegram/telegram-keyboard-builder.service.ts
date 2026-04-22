@@ -77,6 +77,8 @@ export class TelegramKeyboardBuilderService {
       return [{ text: `${prefix}${label}`, callback_data: `o_s:${vehicleId}:${key}` }];
     });
 
+    keyboard.push([{ text: i18n.t('offensiveTest', { lng }), callback_data: `o_t:${vehicleId}` }]);
+
     return {
       keyboard: {
         inline_keyboard: keyboard,

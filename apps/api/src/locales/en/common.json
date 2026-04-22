@@ -65,5 +65,8 @@
   "offensiveFlash": "💡 Flash lights",
   "offensiveHonk": "📯 Honk",
   "offensiveFlashAndHonk": "💡📯 Flash + Honk",
-  "offensiveConfirmed": "✅ <b>{{vehicle}}</b> response set to: {{response}}"
+  "offensiveConfirmed": "✅ <b>{{vehicle}}</b> response set to: {{response}}",
+  "offensiveTest": "🧪 Test",
+  "offensiveTestTriggered": "Test triggered!",
+  "offensiveTestDisabled": "Enable an offensive response first before testing."
 }

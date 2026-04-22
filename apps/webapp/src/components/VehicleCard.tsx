@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Vehicle } from '../lib/api';
+import { testOffensiveResponse, type Vehicle } from '../lib/api';
 import Spinner from './Spinner';
 
 interface VehicleCardProps {
@@ -32,6 +32,8 @@ export default function VehicleCard({
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [isConfiguringBreakIn, setIsConfiguringBreakIn] = useState(false);
   const [isUpdatingResponse, setIsUpdatingResponse] = useState(false);
+  const [isTestingOffensive, setIsTestingOffensive] = useState(false);
+  const [testOffensiveMessage, setTestOffensiveMessage] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
 
@@ -98,11 +100,25 @@ export default function VehicleCard({
   const handleUpdateOffensiveResponse = async (response: string) => {
     setIsUpdatingResponse(true);
     setInlineError(null);
+    setTestOffensiveMessage(null);
     const success = await onUpdateOffensiveResponse(vehicle.vin, response);
     if (!success) {
       setInlineError(t('Failed to update offensive response'));
     }
     setIsUpdatingResponse(false);
+  };
+
+  const handleTestOffensiveResponse = async () => {
+    setIsTestingOffensive(true);
+    setInlineError(null);
+    setTestOffensiveMessage(null);
+    try {
+      await testOffensiveResponse(vehicle.vin);
+      setTestOffensiveMessage(t('Offensive response test triggered'));
+    } catch {
+      setInlineError(t('Failed to test offensive response'));
+    }
+    setIsTestingOffensive(false);
   };
 
   const isMonitoringEnabled = vehicle.sentry_mode_monitoring_enabled || vehicle.break_in_monitoring_enabled;
@@ -295,6 +311,26 @@ export default function VehicleCard({
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {t('Choose what happens when an alert is triggered')}
           </p>
+          {vehicle.offensive_response && vehicle.offensive_response !== 'DISABLED' && (
+            <button
+              onClick={handleTestOffensiveResponse}
+              disabled={isTestingOffensive}
+              className="mt-2 w-full justify-center shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              title={t('Test Offensive Response')}
+            >
+              {isTestingOffensive ? <Spinner /> : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              )}
+              <span>{isTestingOffensive ? t('Testing...') : t('Test')}</span>
+            </button>
+          )}
+          {testOffensiveMessage && (
+            <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+              {testOffensiveMessage}
+            </p>
+          )}
         </div>
       )}
 

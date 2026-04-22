@@ -65,5 +65,8 @@
   "offensiveFlash": "💡 Flash",
   "offensiveHonk": "📯 Klaxon",
   "offensiveFlashAndHonk": "💡📯 Flash + Klaxon",
-  "offensiveConfirmed": "✅ <b>{{vehicle}}</b> réponse définie sur : {{response}}"
+  "offensiveConfirmed": "✅ <b>{{vehicle}}</b> réponse définie sur : {{response}}",
+  "offensiveTest": "🧪 Test",
+  "offensiveTestTriggered": "Test déclenché !",
+  "offensiveTestDisabled": "Activez d'abord une réponse offensive avant de tester."
 }

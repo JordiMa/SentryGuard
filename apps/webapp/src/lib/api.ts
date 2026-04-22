@@ -325,6 +325,14 @@ export async function updateOffensiveResponse(vin: string, offensiveResponse: st
   });
 }
 
+export async function testOffensiveResponse(vin: string): Promise<{
+  message: string;
+}> {
+  return apiRequest(`/telemetry-config/${vin}/test-offensive`, {
+    method: 'POST',
+  });
+}
+
 // ============ Telegram API ============
 
 export interface TelegramLinkInfo {

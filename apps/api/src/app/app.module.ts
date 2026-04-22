@@ -67,7 +67,6 @@ import { RetryManager } from './shared/retry-manager.service';
     VehicleAlertNotifierService,
     SentryAlertHandlerService,
     BreakInAlertHandlerService,
-    OffensiveResponseService,
     {
       provide: kafkaMessageHandler,
       useClass: TelemetryMessageHandlerService,
