@@ -19,6 +19,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { User } from '../../entities/user.entity';
 import { ThrottleOptions } from '../../config/throttle.config';
 import { OffensiveResponse } from '../alerts/enums/offensive-response.enum';
+import { OffensiveResponseService } from '../alerts/services/offensive-response.service';
 
 @Controller('telemetry-config')
 @UseGuards(JwtAuthGuard, ConsentGuard)
