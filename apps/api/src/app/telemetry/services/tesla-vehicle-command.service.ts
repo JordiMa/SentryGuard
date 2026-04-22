@@ -27,7 +27,7 @@ export class TeslaVehicleCommandService {
   }
 
   async honkHorn(vin: string, userId: string): Promise<TeslaCommandResponse> {
-    return this.sendVehicleCommand(vin, userId, 'honk');
+    return this.sendVehicleCommand(vin, userId, 'honk_horn');
   }
 
   private async sendVehicleCommand(
