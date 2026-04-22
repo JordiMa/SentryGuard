@@ -46,8 +46,6 @@ async function bootstrap() {
   // from forwarded headers (CF-Connecting-IP, X-Forwarded-For, X-Real-IP)
   app.getHttpAdapter().getInstance().set('trust proxy', true);
 
-  app.getHttpAdapter().getInstance().set('etag', false);
-
   const port = process.env.PORT || 3001;
 
   process.on('SIGTERM', async () => {

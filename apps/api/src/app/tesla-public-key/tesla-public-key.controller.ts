@@ -1,6 +1,6 @@
-import { Controller, Get, Header, Logger, Res } from '@nestjs/common';
+import { Controller, Get, Header, Logger, Req, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { ThrottleOptions } from '../../config/throttle.config';
 
 @Controller('.well-known/appspecific')
@@ -8,11 +8,11 @@ export class TeslaPublicKeyController {
   private readonly logger = new Logger(TeslaPublicKeyController.name);
 
   @Throttle(ThrottleOptions.publicSensitive())
-  @Get('com.tesla.3p.public-key.pem')
+  @Get('*')
   @Header('Content-Type', 'application/x-pem-file')
   @Header('Content-Disposition', 'attachment; filename="com.tesla.3p.public-key.pem"')
-  getPublicKey(@Res() res: Response) {
-    this.logger.log('📄 Tesla API requesting public key');
+  getPublicKey(@Req() req: Request, @Res() res: Response) {
+    this.logger.log(`📄 Tesla API requesting public key from: ${req.originalUrl}`);
 
     const publicKeyBase64 = process.env.TESLA_PUBLIC_KEY_BASE64;
 
