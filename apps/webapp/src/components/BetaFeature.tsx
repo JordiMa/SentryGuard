@@ -1,6 +1,6 @@
 'use client';
 
-import { useBetaTester } from '../lib/useBetaTester';
+import { useAuthQuery } from '../features/auth/di';
 
 interface BetaFeatureProps {
   children: React.ReactNode;
@@ -9,7 +9,9 @@ interface BetaFeatureProps {
 }
 
 export default function BetaFeature({ children, fallback, showBadge }: BetaFeatureProps) {
-  const { isBetaTester } = useBetaTester();
+  const { query: authQuery } = useAuthQuery();
+  const profile = authQuery.data?.profile;
+  const isBetaTester = profile?.isBetaTester ?? false;
 
   if (!isBetaTester) {
     return fallback ? <>{fallback}</> : null;

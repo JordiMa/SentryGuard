@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { testOffensiveResponse, type Vehicle } from '../lib/api';
+import { testOffensiveResponse, type Vehicle } from '../features/vehicles/domain/entities';
 import Spinner from './Spinner';
 
 interface VehicleCardProps {

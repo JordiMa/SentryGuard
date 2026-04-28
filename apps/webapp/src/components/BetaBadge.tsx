@@ -1,13 +1,15 @@
 'use client';
 
-import { useBetaTester } from '../lib/useBetaTester';
+import { useAuthQuery } from '../features/auth/di';
 
 interface BetaBadgeProps {
   className?: string;
 }
 
 export default function BetaBadge({ className }: BetaBadgeProps) {
-  const { isBetaTester } = useBetaTester();
+  const { query: authQuery } = useAuthQuery();
+  const profile = authQuery.data?.profile;
+  const isBetaTester = profile?.isBetaTester ?? false;
 
   if (!isBetaTester) {
     return null;

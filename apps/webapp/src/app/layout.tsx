@@ -7,8 +7,8 @@ import { Provider as RollbarProvider } from '@rollbar/react';
 import I18nProvider from '../components/I18nProvider';
 import BuyMeACoffeeWidget from '../components/BuyMeACoffeeWidget';
 import { clientConfig } from '@/logger/rollbar.config';
-import { getLocale } from '../lib/server-i18n';
-import { RuntimeConfigProvider } from '../lib/RuntimeConfigProvider';
+import { getLocale } from '../core/i18n/server-i18n';
+import { QueryProvider } from '../core/api/query-provider';
 
 export const metadata: Metadata = {
   title: 'SentryGuard - Protect Your Tesla',
@@ -38,25 +38,15 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const locale = await getLocale();
-  const runtimeConfig = {
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
-    virtualKeyUrl: process.env.NEXT_PUBLIC_VIRTUAL_KEY_PAIRING_URL || '',
-  };
 
   return (
     <RollbarProvider config={clientConfig}>
       <html lang={locale} translate="no">
         <head />
         <body suppressHydrationWarning>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `window.__RUNTIME_CONFIG__ = ${JSON.stringify(runtimeConfig)};`,
-            }}
-          />
-          <RuntimeConfigProvider>
+          <QueryProvider>
             <I18nProvider initialLocale={locale}>{children}</I18nProvider>
-          </RuntimeConfigProvider>
-          <BuyMeACoffeeWidget />
+            <BuyMeACoffeeWidget />
           <Script id="crisp-widget" strategy="afterInteractive">
             {`
               window.$crisp = [];
@@ -70,6 +60,7 @@ export default async function RootLayout({
               })();
             `}
           </Script>
+          </QueryProvider>
         </body>
       </html>
     </RollbarProvider>
