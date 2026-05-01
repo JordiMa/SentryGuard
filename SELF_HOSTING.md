@@ -108,6 +108,52 @@ This approach allows passing all configuration via environment variables without
 - A Tesla Developer account (from [developer.tesla.com](https://developer.tesla.com))
 - Port 11111 open on your firewall/router (for fleet-telemetry)
 
+### 3.1 Alternatives (Managed Services)
+
+If you prefer not to manage PostgreSQL and Kafka yourself, you can use free cloud services instead of the Docker containers:
+
+| Service | Alternative | Free tier |
+|---------|-------------|-----------|
+| PostgreSQL | [Neon](https://neon.tech) or [Supabase](https://supabase.com) | 500 MB |
+| Kafka | [Confluent Cloud](https://confluent.cloud) | 30 partitions |
+
+**PostgreSQL (Neon example):**
+
+Remove the `postgres` service from `docker-compose.selfhost.yml` and set these environment variables in the `api` service:
+
+```env
+DATABASE_HOST=your-project.neon.tech
+DATABASE_PORT=5432
+DATABASE_USER=your-user
+DATABASE_PASSWORD=your-password
+DATABASE_SSL=true
+```
+
+**Kafka (Confluent Cloud example):**
+
+Remove the `kafka` service from `docker-compose.selfhost.yml` and update the `api` and `fleet-telemetry` configuration:
+
+```env
+# In .env
+KAFKA_BROKERS=pkc-xxxxx.region.aws.confluent.cloud:9092
+```
+
+In `config.json`, replace the `kafka` section with SASL authentication:
+
+```json
+{
+  "kafka": {
+    "bootstrap.servers": "pkc-xxxxx.region.aws.confluent.cloud:9092",
+    "security.protocol": "SASL_SSL",
+    "sasl.mechanism": "PLAIN",
+    "sasl.username": "your-api-key",
+    "sasl.password": "your-api-secret"
+  }
+}
+```
+
+> **Note:** Using managed services means your data transits through third-party infrastructure. This is not full self-hosting, but simplifies operations for personal use.
+
 ---
 
 ## 4. DNS & Reverse Proxy Setup
