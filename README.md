@@ -55,7 +55,7 @@ SentryGuard is a comprehensive security monitoring solution for Tesla vehicles. 
 - 🔐 **Tesla OAuth Authentication** - Secure login with your Tesla account
 - 📱 **Telegram Integration** - Instant alerts via deep linking (no manual chatId setup)
 - 🚗 **Multi-Vehicle Support** - Monitor all your Tesla vehicles
-- 📊 **Real-time Telemetry** - Track Sentry Mode, receive instant Telegram notifications when security events occur
+- 📊 **Real-time Telemetry** - Track Sentry Mode and break-in events, receive instant Telegram notifications when security events occur
 - 🚨 **Offensive Response** - Automatically flash lights, honk the horn, or both when an alert is triggered (configurable per vehicle via webapp or Telegram)
 - 🌐 **SEO-Friendly WebApp** - Next.js with server-side rendering
 - 🔒 **Secure by Design** - Encrypted token storage, secure communication

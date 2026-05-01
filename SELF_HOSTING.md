@@ -7,14 +7,16 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
 ## Table of Contents
 
 1. [Architecture Overview](#1-architecture-overview)
-2. [Prerequisites](#2-prerequisites)
-3. [DNS & Reverse Proxy Setup](#3-dns--reverse-proxy-setup)
-4. [Tesla Developer Setup](#4-tesla-developer-setup)
-5. [Generate Certificates](#5-generate-certificates)
-6. [Deploy with Docker Compose](#6-deploy-with-docker-compose)
-7. [Post-Deployment Configuration](#7-post-deployment-configuration)
-8. [Environment Variables Reference](#8-environment-variables-reference)
-9. [Troubleshooting](#9-troubleshooting)
+2. [Custom Docker Images](#2-custom-docker-images)
+3. [Prerequisites](#3-prerequisites)
+4. [DNS & Reverse Proxy Setup](#4-dns--reverse-proxy-setup)
+5. [Kafka KRaft Mode](#5-kafka-kraft-mode)
+6. [Tesla Developer Setup](#6-tesla-developer-setup)
+7. [Generate Certificates](#7-generate-certificates)
+8. [Deploy with Docker Compose](#8-deploy-with-docker-compose)
+9. [Post-Deployment Configuration](#9-post-deployment-configuration)
+10. [Environment Variables Reference](#10-environment-variables-reference)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -37,18 +39,18 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
         │(Next.js)│  │  (NestJS)  │
         └─────────┘  └──────┬─────┘
                             │
-                     ┌──────┼──────┐
-                     │      │      │
-             ┌───────▼─┐ ┌──▼───┐ ┌▼───────┐
-             │Postgres │ │Kafka │ │ Zookpr │
-             │         │ │      │ │        │
-             │  :5432  │ │:29092│ │ :2181  │
-             └─────────┘ └──────┘ └────────┘
+                     ┌──────┴─────┐
+                     │            │
+             ┌───────▼─┐   ┌──────▼──────┐
+             │Postgres │   │    Kafka    │
+             │         │   │  (KRaft)    │
+             │  :5432  │   │   :29092    │
+             └─────────┘   └─────────────┘
 
-       ┌──────────────────────────────────┐
-       │  fleet-telemetry :443  ◄── Tesla │
-       │  vehicle-command :443  ──► Tesla │
-       └──────────────────────────────────┘
+       ┌───────────────────────────────────┐
+       │  fleet-telemetry :8443  ◄── Tesla │
+       │  vehicle-command :8443  ──► Tesla │
+       └───────────────────────────────────┘
                (on sentryguard network)
 ```
 
@@ -56,15 +58,48 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
 - **webapp**: Next.js frontend (internal port 3000)
 - **api**: NestJS backend (internal port 3001)
 - **postgres**: PostgreSQL database
-- **kafka + zookeeper**: Message broker for telemetry data
-- **fleet-telemetry**: Tesla Fleet Telemetry server (receives vehicle data, port 443)
-- **vehicle-command**: Tesla Vehicle Command proxy (sends commands to vehicles, port 443)
+- **kafka**: Message broker for telemetry data (KRaft mode, no Zookeeper required)
+- **fleet-telemetry**: Tesla Fleet Telemetry server (receives vehicle data, port 8443)
+- **vehicle-command**: Tesla Vehicle Command service (sends commands to vehicles, port 8443)
 
 **Docker network**: All services communicate on a `sentryguard` bridge network. Only API and webapp are exposed through the reverse proxy. Fleet-telemetry needs a public port for Tesla to connect.
 
 ---
 
-## 2. Prerequisites
+## 2. Custom Docker Images
+
+SentryGuard uses custom Docker images instead of the official Tesla images to simplify self-hosted deployment.
+
+### Why custom images?
+
+The official Tesla images (`tesla/vehicle-command`, `tesla/fleet-telemetry`) present several challenges for self-hosted deployment:
+
+- **No base64 support**: No built-in mechanism to decode base64 environment variables into certificate files
+- **Privileged port binding**: Cannot bind to port 443 without running as root — internal ports use 8443 instead
+- **Complex configuration**: Require mounting volumes for certificates and config files
+
+### Images used
+
+| Image | Description |
+|-------|-------------|
+| `abarghoud/sentryguard-fleet-telemetry:latest` | Fleet Telemetry with base64 decoding and automatic certificate generation |
+| `abarghoud/sentryguard-vehicle-command:latest` | Vehicle Command Proxy with base64 decoding and simplified configuration |
+| `ghcr.io/abarghoud/sentryguard-api:latest` | NestJS API (pre-built) |
+| `ghcr.io/abarghoud/sentryguard-webapp:latest` | Next.js Webapp (pre-built) |
+
+### How they work
+
+The custom images include an `entrypoint.sh` that:
+
+1. **Decodes** `*_B64` environment variables (config, certificates, keys) into files
+2. **Generates** configuration files in `/config/` or `/etc/fleet-telemetry/certs/`
+3. **Launches** the service with the correct parameters
+
+This approach allows passing all configuration via environment variables without mounting complex volumes.
+
+---
+
+## 3. Prerequisites
 
 - A server with Docker and Docker Compose (Synology NAS, VPS, Raspberry Pi, etc.)
 - A domain name (e.g., `yourdomain.com`)
@@ -73,11 +108,57 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
 - A Tesla Developer account (from [developer.tesla.com](https://developer.tesla.com))
 - Port 11111 open on your firewall/router (for fleet-telemetry)
 
+### 3.1 Alternatives (Managed Services)
+
+If you prefer not to manage PostgreSQL and Kafka yourself, you can use free cloud services instead of the Docker containers:
+
+| Service | Alternative | Free tier |
+|---------|-------------|-----------|
+| PostgreSQL | [Neon](https://neon.tech) or [Supabase](https://supabase.com) | 500 MB |
+| Kafka | [Confluent Cloud](https://confluent.cloud) | 30 partitions |
+
+**PostgreSQL (Neon example):**
+
+Remove the `postgres` service from `docker-compose.selfhost.yml` and set these environment variables in the `api` service:
+
+```env
+DATABASE_HOST=your-project.neon.tech
+DATABASE_PORT=5432
+DATABASE_USER=your-user
+DATABASE_PASSWORD=your-password
+DATABASE_SSL=true
+```
+
+**Kafka (Confluent Cloud example):**
+
+Remove the `kafka` service from `docker-compose.selfhost.yml` and update the `api` and `fleet-telemetry` configuration:
+
+```env
+# In .env
+KAFKA_BROKERS=pkc-xxxxx.region.aws.confluent.cloud:9092
+```
+
+In `config.json`, replace the `kafka` section with SASL authentication:
+
+```json
+{
+  "kafka": {
+    "bootstrap.servers": "pkc-xxxxx.region.aws.confluent.cloud:9092",
+    "security.protocol": "SASL_SSL",
+    "sasl.mechanism": "PLAIN",
+    "sasl.username": "your-api-key",
+    "sasl.password": "your-api-secret"
+  }
+}
+```
+
+> **Note:** Using managed services means your data transits through third-party infrastructure. This is not full self-hosting, but simplifies operations for personal use.
+
 ---
 
-## 3. DNS & Reverse Proxy Setup
+## 4. DNS & Reverse Proxy Setup
 
-### 3.1 DNS Records
+### 4.1 DNS Records
 
 Create these DNS records pointing to your server:
 
@@ -89,7 +170,7 @@ Create these DNS records pointing to your server:
 
 > **Important**: If you use Cloudflare, set `fleet-telemetry.yourdomain.com` to **DNS only** (grey cloud). Cloudflare's proxy does not handle TLS connections on custom ports.
 
-### 3.2 Reverse Proxy
+### 4.2 Reverse Proxy
 
 You need a reverse proxy to terminate SSL for the webapp and API. Any of these will work:
 - **Nginx Proxy Manager** (easiest for NAS users)
@@ -103,11 +184,11 @@ Configure three proxy hosts:
 |-----------|-----------|------|-------|
 | `yourdomain.com` | `sentryguard-webapp` (or host:3020) | 3000 | Webapp |
 | `api.yourdomain.com` | `sentryguard-api` (or host:3021) | 3001 | API |
-| `fleet-telemetry.yourdomain.com` | Direct (port 11111) | 443 | No reverse proxy — Tesla connects directly |
+| `fleet-telemetry.yourdomain.com` | Direct (port 11111) | 8443 | No reverse proxy — Tesla connects directly |
 
 > **Fleet telemetry**: Tesla connects to port 11111 with mutual TLS. Do NOT proxy this through your reverse proxy — expose port 11111 directly on your firewall/router and map it to the `sentryguard-fleet-telemetry` container.
 
-### 3.3 SSL Certificates
+### 4.3 SSL Certificates
 
 For the webapp and API:
 - Use Let's Encrypt (free, auto-renewing) or any valid SSL certificate
@@ -119,9 +200,61 @@ For fleet-telemetry:
 
 ---
 
-## 4. Tesla Developer Setup
+## 5. Kafka KRaft Mode
 
-### 4.1 Create a Tesla Developer Application
+### What is KRaft?
+
+KRaft (Kafka Raft) is Kafka's built-in quorum mode that eliminates the need for Zookeeper. Since Kafka 3.4+, KRaft is stable and recommended for simple deployments.
+
+### Why KRaft?
+
+| Aspect | Zookeeper | KRaft |
+|--------|-----------|-------|
+| Components | 2 (Kafka + Zookeeper) | 1 (Kafka only) |
+| Configuration | Complex | Simplified |
+| Resources | More RAM/CPU | Fewer resources |
+| Single-node deployment | Not supported | Supported |
+| Operational overhead | Higher | Lower |
+
+### Configuration in SentryGuard
+
+The docker-compose uses these key KRaft variables:
+
+```yaml
+kafka:
+  environment:
+    KAFKA_NODE_ID: 1
+    KAFKA_PROCESS_ROLES: broker,controller
+    KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+    KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
+    KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+    KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+```
+
+### Critical variables
+
+- **`KAFKA_PROCESS_ROLES: broker,controller`** — The node acts as both broker and controller
+- **`KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER`** — Required for KRaft mode; must match the controller listener name in `KAFKA_LISTENERS`
+- **`CLUSTER_ID`** — Unique cluster ID (generate once with `uuidgen` or `openssl rand -hex 16`, do not change after first start)
+- **`KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'`** — Topics are created automatically when data arrives
+
+### Verify Kafka is running
+
+```bash
+docker exec sentryguard-kafka kafka-broker-api-versions --bootstrap-server localhost:9092
+```
+
+If this command returns a list of API versions, Kafka is running correctly.
+
+---
+
+## 6. Tesla Developer Setup
+
+### 6.1 Create a Tesla Developer Application
 
 1. Go to [developer.tesla.com](https://developer.tesla.com) and create an application
 2. Set the **Redirect URI** to: `https://api.yourdomain.com/callback/auth`
@@ -131,24 +264,40 @@ For fleet-telemetry:
    - North America: `https://fleet-api.prd.na.vn.cloud.tesla.com`
    - Asia Pacific: `https://fleet-api.prd.cn.vn.cloud.tesla.com`
 
-### 4.2 Register as a Fleet API Partner
+### 6.2 Register as a Fleet API Partner
 
-After creating your application, register it as a partner:
+After creating your application, register it as a partner. Tesla requires registering your domain in each region where your users have vehicles — you need a separate partner account per region.
 
 ```bash
-# Get a client_credentials token first
+# Get a client_credentials token first (use your region-specific audience)
 curl -X POST https://auth.tesla.com/oauth2/v3/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET&scope=openid+offline_access+vehicle_device_data+vehicle_cmds+vehicle_location&audience=https://fleet-api.prd.eu.vn.cloud.tesla.com"
 
-# Register as partner
-curl -X POST https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/partner_accounts \
+# Register in EACH region where your users have vehicles:
+
+# North America, Asia-Pacific (excluding China)
+curl -X POST "https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/partner_accounts" \
+  -H "Authorization: Bearer YOUR_CLIENT_CREDENTIALS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"yourdomain.com"}'
+
+# Europe, Middle East, Africa
+curl -X POST "https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/partner_accounts" \
+  -H "Authorization: Bearer YOUR_CLIENT_CREDENTIALS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"yourdomain.com"}'
+
+# China (requires a separate account on tesla.cn)
+curl -X POST "https://fleet-api.prd.cn.vn.cloud.tesla.cn/api/1/partner_accounts" \
   -H "Authorization: Bearer YOUR_CLIENT_CREDENTIALS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"domain":"yourdomain.com"}'
 ```
 
-### 4.3 Upload Public Key to Your Domain
+> **Note:** Register only in the regions where your users have vehicles. If all your users are in one region, you only need to register with that region's endpoint.
+
+### 6.3 Upload Public Key to Your Domain
 
 The Tesla well-known public key must be accessible at:
 ```
@@ -178,11 +327,11 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 ---
 
-## 5. Generate Certificates
+## 7. Generate Certificates
 
 You need `openssl` installed. Create the `fleet-telemetry/certs/` directory and run each step below.
 
-### 5.1 Generate the CA Certificate
+### 7.1 Generate the CA Certificate
 
 ```bash
 mkdir -p fleet-telemetry/certs
@@ -197,7 +346,7 @@ openssl req -x509 -nodes -new -key ca.key \
   -addext "keyUsage=critical,keyCertSign,cRLSign"
 ```
 
-### 5.2 Generate the Server Certificate (signed by CA)
+### 7.2 Generate the Server Certificate (signed by CA)
 
 Replace `fleet-telemetry.yourdomain.com` with your actual fleet-telemetry hostname:
 
@@ -221,47 +370,82 @@ openssl x509 -req -in tls.csr \
 rm -f tls.csr ca.srl
 ```
 
-### 5.3 Generate the Tesla Command Key Pair
+### 7.3 Generate the Tesla Command Key Pair
 
 ```bash
 openssl ecparam -name prime256v1 -genkey -noout -out private-key.pem
 openssl ec -in private-key.pem -pubout -out public-key.pem
 ```
 
-### 5.4 Get the Environment Variable Values
+### 7.4 Generate the Fleet Telemetry Config
+
+Create the `config.json` file for fleet-telemetry:
 
 ```bash
-echo "LETS_ENCRYPT_CERTIFICATE=$(cat ca.crt | base64 | tr -d '\n')"
-echo "TESLA_PUBLIC_KEY_BASE64=$(cat public-key.pem | base64 | tr -d '\n')"
+cat > config.json << 'EOF'
+{
+  "port": 8443,
+  "kafka": {
+    "brokers": ["kafka:29092"],
+    "topic": "FleetTelemetry_V"
+  },
+  "logger": {
+    "level": "info"
+  },
+  "server": {
+    "cert": "/etc/fleet-telemetry/certs/fullchain.pem",
+    "key": "/etc/fleet-telemetry/certs/privkey.pem",
+    "ca": "/etc/fleet-telemetry/certs/test-vehicles-ca.crt"
+  },
+  "metrics": {
+    "port": 9090
+  }
+}
+EOF
 ```
 
-Save these two values — you'll need them in your `.env` file.
+### 7.5 Get the Base64 Environment Variable Values
+
+Encode each file to base64 (Linux/macOS):
+
+```bash
+# Fleet Telemetry
+echo "FLEET_TELEMETRY_CONFIG_B64=$(base64 -w 0 config.json)"
+echo "FLEET_TELEMETRY_SERVER_CERT_B64=$(base64 -w 0 tls.crt)"
+echo "FLEET_TELEMETRY_SERVER_KEY_B64=$(base64 -w 0 tls.key)"
+echo "FLEET_TELEMETRY_CA_FILE_B64=$(base64 -w 0 ca.crt)"
+
+# Vehicle Command Proxy
+echo "VEHICLE_COMMAND_TLS_KEY_B64=$(base64 -w 0 tls.key)"
+echo "VEHICLE_COMMAND_TLS_CERT_B64=$(base64 -w 0 tls.crt)"
+echo "VEHICLE_COMMAND_PRIVATE_KEY_B64=$(base64 -w 0 private-key.pem)"
+
+# API (legacy variables)
+echo "LETS_ENCRYPT_CERTIFICATE=$(base64 -w 0 ca.crt)"
+echo "TESLA_PUBLIC_KEY_BASE64=$(base64 -w 0 public-key.pem)"
+```
+
+Save these values — you'll need them in your `.env` file.
 
 > **Important**: Register `public-key.pem` at [developer.tesla.com](https://developer.tesla.com) and serve it at `https://yourdomain.com/.well-known/appspecific/com.tesla.3p.public-key.pem` (the webapp proxies this path automatically).
 
-### 5.5 Certificate Files Summary
+### 7.6 Certificate Files Summary
 
-| File | Purpose |
-|------|---------|
-| `ca.key` | Fleet Telemetry CA private key (**keep secret**) |
-| `ca.crt` | Fleet Telemetry CA certificate (used by API and fleet-telemetry) |
-| `tls.key` | Fleet Telemetry server private key |
-| `tls.crt` | Fleet Telemetry server certificate (signed by CA) |
-| `private-key.pem` | Tesla vehicle command private key (**keep secret**) |
-| `public-key.pem` | Tesla vehicle command public key (register at Tesla + well-known URL) |
-
-### 5.6 Copy Certificates to Your Server
-
-```bash
-# Example for Synology NAS
-scp -r fleet-telemetry/ admin@your-server:/volume1/docker/sentryguard/fleet-telemetry/
-```
+| File | Purpose | Environment Variable |
+|------|---------|---------------------|
+| `ca.key` | Fleet Telemetry CA private key (**keep secret**) | — |
+| `ca.crt` | Fleet Telemetry CA certificate | `FLEET_TELEMETRY_CA_FILE_B64`, `LETS_ENCRYPT_CERTIFICATE` |
+| `tls.key` | Fleet Telemetry server private key | `FLEET_TELEMETRY_SERVER_KEY_B64`, `VEHICLE_COMMAND_TLS_KEY_B64` |
+| `tls.crt` | Fleet Telemetry server certificate (signed by CA) | `FLEET_TELEMETRY_SERVER_CERT_B64`, `VEHICLE_COMMAND_TLS_CERT_B64` |
+| `config.json` | Fleet Telemetry configuration | `FLEET_TELEMETRY_CONFIG_B64` |
+| `private-key.pem` | Tesla vehicle command private key (**keep secret**) | `VEHICLE_COMMAND_PRIVATE_KEY_B64` |
+| `public-key.pem` | Tesla vehicle command public key | `TESLA_PUBLIC_KEY_BASE64` |
 
 ---
 
-## 6. Deploy with Docker Compose
+## 8. Deploy with Docker Compose
 
-### 6.1 Create the `.env` File
+### 8.1 Create the `.env` File
 
 Copy the example file and fill in your values:
 
@@ -271,7 +455,7 @@ cp apps/api/.env.selfhost.example /volume1/docker/sentryguard/.env
 
 Edit `/volume1/docker/sentryguard/.env` — all variables marked `REQUIRED` must be set, docker-compose will fail if any are missing.
 
-### 6.2 Deploy
+### 8.2 Deploy
 
 ```bash
 cd /volume1/docker/sentryguard
@@ -286,7 +470,7 @@ docker compose -f docker-compose.selfhost.yml --env-file .env up -d
 docker compose -f docker-compose.selfhost.yml logs -f
 ```
 
-### 6.3 Verify Services
+### 8.3 Verify Services
 
 ```bash
 # Check all containers are running
@@ -301,9 +485,9 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:3020
 
 ---
 
-## 7. Post-Deployment Configuration
+## 9. Post-Deployment Configuration
 
-### 7.1 Virtual Key Pairing
+### 9.1 Virtual Key Pairing
 
 After logging in for the first time:
 
@@ -311,7 +495,7 @@ After logging in for the first time:
 2. This opens Tesla's website — approve the key in the Tesla app on your phone
 3. Return to SentryGuard and refresh vehicles
 
-### 7.2 Verify Fleet Telemetry
+### 9.2 Verify Fleet Telemetry
 
 From your local machine, test the fleet-telemetry endpoint:
 
@@ -323,7 +507,7 @@ curl -v --cacert fleet-telemetry/certs/ca.crt \
 
 You should get a TLS handshake (the connection may close quickly — that's normal, it's expecting mTLS).
 
-### 7.3 Verify Vehicle Configuration
+### 9.3 Verify Vehicle Configuration
 
 Check API logs to confirm telemetry configuration works:
 
@@ -345,7 +529,7 @@ Common errors:
   ❌ https://fleet-telemetry.yourdomain.com/
   ```
 
-### 7.4 Kafka Topic
+### 9.4 Kafka Topic
 
 The fleet-telemetry server sends vehicle data to the `FleetTelemetry_V` Kafka topic. Ensure it exists:
 
@@ -364,7 +548,7 @@ docker exec sentryguard-kafka kafka-topics --bootstrap-server localhost:9092 \
 
 ---
 
-## 8. Environment Variables Reference
+## 10. Environment Variables Reference
 
 ### Required
 
@@ -410,7 +594,7 @@ docker exec sentryguard-kafka kafka-topics --bootstrap-server localhost:9092 \
 
 ---
 
-## 9. Troubleshooting
+## 11. Troubleshooting
 
 ### API returns "ca is not a valid PEM"
 
@@ -464,7 +648,7 @@ Possible reasons:
 Synology NAS often uses port 443. The docker-compose maps:
 - `3021:3001` (API)
 - `3020:3000` (webapp)
-- `11111:443` (fleet-telemetry)
+- `11111:8443` (fleet-telemetry)
 
 Make sure these ports are available on your host.
 

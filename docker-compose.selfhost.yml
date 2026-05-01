@@ -2,9 +2,8 @@
 #
 # Prerequisites:
 #   1. Create a folder on your server (e.g. /volume1/docker/sentryguard/)
-#   2. Copy fleet-telemetry/ folder there
-#   3. Generate certificates (see SELF_HOSTING.md)
-#   4. Create .env file (see SELF_HOSTING.md)
+#   2. Generate certificates (see SELF_HOSTING.md)
+#   3. Create .env file (see SELF_HOSTING.md)
 #
 # Deploy:
 #   docker compose -f docker-compose.selfhost.yml --env-file .env up -d
@@ -33,41 +32,23 @@ services:
     networks:
       - sentryguard
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
-    container_name: sentryguard-zookeeper
-    restart: unless-stopped
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    healthcheck:
-      test: ["CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - sentryguard
-
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
+    image: apache/kafka:4.1.1
     container_name: sentryguard-kafka
     restart: unless-stopped
-    depends_on:
-      zookeeper:
-        condition: service_healthy
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -75,46 +56,41 @@ services:
       - sentryguard
 
   fleet-telemetry:
-    image: tesla/fleet-telemetry:latest
+    image: abarghoud/sentryguard-fleet-telemetry:latest
     container_name: sentryguard-fleet-telemetry
     restart: unless-stopped
-    user: root
     depends_on:
       kafka:
         condition: service_healthy
-    volumes:
-      - /volume1/docker/sentryguard/fleet-telemetry/config.json:/etc/fleet-telemetry/config.json:ro
-      - /volume1/docker/sentryguard/fleet-telemetry/certs:/etc/fleet-telemetry/certs:ro
-    command: ["/fleet-telemetry", "-config=/etc/fleet-telemetry/config.json"]
     ports:
-      - "${TESLA_FLEET_TELEMETRY_SERVER_PORT:-11111}:443"
+      - "${TESLA_FLEET_TELEMETRY_SERVER_PORT:-11111}:8443"
     environment:
-      SUPPRESS_TLS_HANDSHAKE_ERROR_LOGGING: "true"
+      FLEET_TELEMETRY_CONFIG_B64: ${FLEET_TELEMETRY_CONFIG_B64:?required}
+      FLEET_TELEMETRY_SERVER_CERT_B64: ${FLEET_TELEMETRY_SERVER_CERT_B64:?required}
+      FLEET_TELEMETRY_SERVER_KEY_B64: ${FLEET_TELEMETRY_SERVER_KEY_B64:?required}
+      FLEET_TELEMETRY_CA_FILE_B64: ${FLEET_TELEMETRY_CA_FILE_B64:-}
     networks:
       - sentryguard
 
   vehicle-command:
-    image: tesla/vehicle-command:latest
+    image: abarghoud/sentryguard-vehicle-command:latest
     container_name: sentryguard-vehicle-command
     restart: unless-stopped
-    user: root
-    volumes:
-      - /volume1/docker/sentryguard/fleet-telemetry/certs:/config
-    command: >
-      -tls-key /config/tls.key
-      -cert /config/tls.crt
-      -key-file /config/private-key.pem
-      -host 0.0.0.0
-      -port 443
     environment:
-      TESLA_KEY_NAME: ${TESLA_KEY_NAME:-sentryguard}
-      TESLA_CACHE_FILE: /tmp/.tesla-cache.json
-      TESLA_VERBOSE: "1"
+      VEHICLE_COMMAND_TLS_KEY_B64: ${VEHICLE_COMMAND_TLS_KEY_B64:?required}
+      VEHICLE_COMMAND_TLS_CERT_B64: ${VEHICLE_COMMAND_TLS_CERT_B64:?required}
+      VEHICLE_COMMAND_PRIVATE_KEY_B64: ${VEHICLE_COMMAND_PRIVATE_KEY_B64:?required}
+      VEHICLE_COMMAND_PORT: 8443
     networks:
       - sentryguard
+    healthcheck:
+      test: [ "CMD-SHELL", "exit 0" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   api:
-    image: ghcr.io/jordima/sentryguard-api:latest
+    image: ghcr.io/abarghoud/sentryguard-api:latest
     container_name: sentryguard-api
     restart: unless-stopped
     depends_on:
@@ -146,7 +122,7 @@ services:
       TESLA_CLIENT_SECRET: ${TESLA_CLIENT_SECRET:?TESLA_CLIENT_SECRET is required}
       TESLA_AUDIENCE: ${TESLA_AUDIENCE:-https://fleet-api.prd.eu.vn.cloud.tesla.com}
       TESLA_REDIRECT_URI: ${TESLA_REDIRECT_URI:?TESLA_REDIRECT_URI is required}
-      TESLA_API_BASE_URL: https://vehicle-command:443
+      TESLA_API_BASE_URL: https://vehicle-command:8443
       TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME: ${TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME:?TESLA_FLEET_TELEMETRY_SERVER_HOSTNAME is required}
       TESLA_FLEET_TELEMETRY_SERVER_PORT: ${TESLA_FLEET_TELEMETRY_SERVER_PORT:-11111}
       LETS_ENCRYPT_CERTIFICATE: ${LETS_ENCRYPT_CERTIFICATE:?LETS_ENCRYPT_CERTIFICATE is required}
@@ -161,7 +137,7 @@ services:
       - sentryguard
 
   webapp:
-    image: ghcr.io/jordima/sentryguard-webapp:latest
+    image: ghcr.io/abarghoud/sentryguard-webapp:latest
     container_name: sentryguard-webapp
     restart: unless-stopped
     depends_on:

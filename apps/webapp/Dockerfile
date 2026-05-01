@@ -1,20 +1,31 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 RUN corepack enable
 WORKDIR /app
 
-COPY . .
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/webapp/package.json ./apps/webapp/
+COPY libs/beta/domain/package.json ./libs/beta/domain/
 
 RUN yarn install --immutable
 
+COPY . .
+
 RUN npx nx build webapp
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
 WORKDIR /app
 ENV NODE_ENV=production
 
 COPY --from=builder /app/apps/webapp/.next/standalone ./
 COPY --from=builder /app/apps/webapp/.next/static ./apps/webapp/.next/static
 COPY --from=builder /app/apps/webapp/public ./apps/webapp/public
+
+RUN chown -R appuser:appgroup /app
+
+USER appuser
 
 EXPOSE 3000
 CMD ["node", "apps/webapp/server.js"]
