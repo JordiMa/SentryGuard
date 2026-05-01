@@ -2,12 +2,12 @@ import { getToken } from './token-manager';
 
 const DEFAULT_API_URL = 'http://localhost:3001';
 
-let cachedApiUrl: string | null = null;
-let fetchPromise: Promise<string> | null = null;
+let cachedConfig: { apiUrl: string; virtualKeyUrl: string } | null = null;
+let fetchPromise: Promise<{ apiUrl: string; virtualKeyUrl: string }> | null = null;
 
-async function resolveApiUrl(): Promise<string> {
-  if (cachedApiUrl) {
-    return cachedApiUrl;
+async function resolveRuntimeConfig(): Promise<{ apiUrl: string; virtualKeyUrl: string }> {
+  if (cachedConfig) {
+    return cachedConfig;
   }
 
   if (fetchPromise) {
@@ -16,19 +16,32 @@ async function resolveApiUrl(): Promise<string> {
 
   fetchPromise = fetch('/api/runtime-config')
     .then((res) => res.json())
-    .then((data: { apiUrl?: string }) => {
-      cachedApiUrl = data.apiUrl || DEFAULT_API_URL;
-      return cachedApiUrl;
+    .then((data: { apiUrl?: string; virtualKeyUrl?: string }) => {
+      cachedConfig = {
+        apiUrl: data.apiUrl || DEFAULT_API_URL,
+        virtualKeyUrl: data.virtualKeyUrl || '',
+      };
+      return cachedConfig;
     })
     .catch(() => {
-      cachedApiUrl = DEFAULT_API_URL;
-      return cachedApiUrl;
+      cachedConfig = { apiUrl: DEFAULT_API_URL, virtualKeyUrl: '' };
+      return cachedConfig;
     })
     .finally(() => {
       fetchPromise = null;
     });
 
   return fetchPromise;
+}
+
+export async function resolveApiUrl(): Promise<string> {
+  const config = await resolveRuntimeConfig();
+  return config.apiUrl;
+}
+
+export async function resolveVirtualKeyUrl(): Promise<string> {
+  const config = await resolveRuntimeConfig();
+  return config.virtualKeyUrl;
 }
 
 export class ApiError extends Error {

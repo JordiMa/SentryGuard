@@ -37,13 +37,13 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
         │(Next.js)│  │  (NestJS)  │
         └─────────┘  └──────┬─────┘
                             │
-                     ┌──────┼──────┐
-                     │      │      │
-             ┌───────▼─┐ ┌──▼───┐ ┌▼───────┐
-             │Postgres │ │Kafka │ │ Zookpr │
-             │         │ │      │ │        │
-             │  :5432  │ │:29092│ │ :2181  │
-             └─────────┘ └──────┘ └────────┘
+                     ┌──────┴─────┐
+                     │            │
+             ┌───────▼─┐   ┌──────▼──────┐
+             │Postgres │   │    Kafka    │
+             │         │   │  (KRaft)    │
+             │  :5432  │   │   :29092    │
+             └─────────┘   └─────────────┘
 
        ┌──────────────────────────────────┐
        │  fleet-telemetry :443  ◄── Tesla │
@@ -56,9 +56,9 @@ Complete guide to deploy SentryGuard on your own server (Synology NAS, VPS, etc.
 - **webapp**: Next.js frontend (internal port 3000)
 - **api**: NestJS backend (internal port 3001)
 - **postgres**: PostgreSQL database
-- **kafka + zookeeper**: Message broker for telemetry data
+- **kafka**: Message broker for telemetry data (KRaft mode, no Zookeeper required)
 - **fleet-telemetry**: Tesla Fleet Telemetry server (receives vehicle data, port 443)
-- **vehicle-command**: Tesla Vehicle Command proxy (sends commands to vehicles, port 443)
+- **vehicle-command**: Tesla Vehicle Command service (sends commands to vehicles, port 443)
 
 **Docker network**: All services communicate on a `sentryguard` bridge network. Only API and webapp are exposed through the reverse proxy. Fleet-telemetry needs a public port for Tesla to connect.
 
@@ -133,20 +133,36 @@ For fleet-telemetry:
 
 ### 4.2 Register as a Fleet API Partner
 
-After creating your application, register it as a partner:
+After creating your application, register it as a partner. Tesla requires registering your domain in each region where your users have vehicles — you need a separate partner account per region.
 
 ```bash
-# Get a client_credentials token first
+# Get a client_credentials token first (use your region-specific audience)
 curl -X POST https://auth.tesla.com/oauth2/v3/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials&client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET&scope=openid+offline_access+vehicle_device_data+vehicle_cmds+vehicle_location&audience=https://fleet-api.prd.eu.vn.cloud.tesla.com"
 
-# Register as partner
-curl -X POST https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/partner_accounts \
+# Register in EACH region where your users have vehicles:
+
+# North America, Asia-Pacific (excluding China)
+curl -X POST "https://fleet-api.prd.na.vn.cloud.tesla.com/api/1/partner_accounts" \
+  -H "Authorization: Bearer YOUR_CLIENT_CREDENTIALS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"yourdomain.com"}'
+
+# Europe, Middle East, Africa
+curl -X POST "https://fleet-api.prd.eu.vn.cloud.tesla.com/api/1/partner_accounts" \
+  -H "Authorization: Bearer YOUR_CLIENT_CREDENTIALS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"yourdomain.com"}'
+
+# China (requires a separate account on tesla.cn)
+curl -X POST "https://fleet-api.prd.cn.vn.cloud.tesla.cn/api/1/partner_accounts" \
   -H "Authorization: Bearer YOUR_CLIENT_CREDENTIALS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"domain":"yourdomain.com"}'
 ```
+
+> **Note:** Register only in the regions where your users have vehicles. If all your users are in one region, you only need to register with that region's endpoint.
 
 ### 4.3 Upload Public Key to Your Domain
 
@@ -228,34 +244,69 @@ openssl ecparam -name prime256v1 -genkey -noout -out private-key.pem
 openssl ec -in private-key.pem -pubout -out public-key.pem
 ```
 
-### 5.4 Get the Environment Variable Values
+### 5.4 Generate the Fleet Telemetry Config
+
+Create the `config.json` file for fleet-telemetry:
 
 ```bash
-echo "LETS_ENCRYPT_CERTIFICATE=$(cat ca.crt | base64 | tr -d '\n')"
-echo "TESLA_PUBLIC_KEY_BASE64=$(cat public-key.pem | base64 | tr -d '\n')"
+cat > config.json << 'EOF'
+{
+  "port": 443,
+  "kafka": {
+    "brokers": ["kafka:29092"],
+    "topic": "FleetTelemetry_V"
+  },
+  "logger": {
+    "level": "info"
+  },
+  "server": {
+    "cert": "/etc/fleet-telemetry/certs/fullchain.pem",
+    "key": "/etc/fleet-telemetry/certs/privkey.pem",
+    "ca": "/etc/fleet-telemetry/certs/test-vehicles-ca.crt"
+  },
+  "metrics": {
+    "port": 9090
+  }
+}
+EOF
 ```
 
-Save these two values — you'll need them in your `.env` file.
+### 5.5 Get the Base64 Environment Variable Values
+
+Encode each file to base64 (Linux/macOS):
+
+```bash
+# Fleet Telemetry
+echo "FLEET_TELEMETRY_CONFIG_B64=$(base64 -w 0 config.json)"
+echo "FLEET_TELEMETRY_SERVER_CERT_B64=$(base64 -w 0 tls.crt)"
+echo "FLEET_TELEMETRY_SERVER_KEY_B64=$(base64 -w 0 tls.key)"
+echo "FLEET_TELEMETRY_CA_FILE_B64=$(base64 -w 0 ca.crt)"
+
+# Vehicle Command Proxy
+echo "VEHICLE_COMMAND_TLS_KEY_B64=$(base64 -w 0 tls.key)"
+echo "VEHICLE_COMMAND_TLS_CERT_B64=$(base64 -w 0 tls.crt)"
+echo "VEHICLE_COMMAND_PRIVATE_KEY_B64=$(base64 -w 0 private-key.pem)"
+
+# API (legacy variables)
+echo "LETS_ENCRYPT_CERTIFICATE=$(base64 -w 0 ca.crt)"
+echo "TESLA_PUBLIC_KEY_BASE64=$(base64 -w 0 public-key.pem)"
+```
+
+Save these values — you'll need them in your `.env` file.
 
 > **Important**: Register `public-key.pem` at [developer.tesla.com](https://developer.tesla.com) and serve it at `https://yourdomain.com/.well-known/appspecific/com.tesla.3p.public-key.pem` (the webapp proxies this path automatically).
 
-### 5.5 Certificate Files Summary
+### 5.6 Certificate Files Summary
 
-| File | Purpose |
-|------|---------|
-| `ca.key` | Fleet Telemetry CA private key (**keep secret**) |
-| `ca.crt` | Fleet Telemetry CA certificate (used by API and fleet-telemetry) |
-| `tls.key` | Fleet Telemetry server private key |
-| `tls.crt` | Fleet Telemetry server certificate (signed by CA) |
-| `private-key.pem` | Tesla vehicle command private key (**keep secret**) |
-| `public-key.pem` | Tesla vehicle command public key (register at Tesla + well-known URL) |
-
-### 5.6 Copy Certificates to Your Server
-
-```bash
-# Example for Synology NAS
-scp -r fleet-telemetry/ admin@your-server:/volume1/docker/sentryguard/fleet-telemetry/
-```
+| File | Purpose | Environment Variable |
+|------|---------|---------------------|
+| `ca.key` | Fleet Telemetry CA private key (**keep secret**) | — |
+| `ca.crt` | Fleet Telemetry CA certificate | `FLEET_TELEMETRY_CA_FILE_B64`, `LETS_ENCRYPT_CERTIFICATE` |
+| `tls.key` | Fleet Telemetry server private key | `FLEET_TELEMETRY_SERVER_KEY_B64`, `VEHICLE_COMMAND_TLS_KEY_B64` |
+| `tls.crt` | Fleet Telemetry server certificate (signed by CA) | `FLEET_TELEMETRY_SERVER_CERT_B64`, `VEHICLE_COMMAND_TLS_CERT_B64` |
+| `config.json` | Fleet Telemetry configuration | `FLEET_TELEMETRY_CONFIG_B64` |
+| `private-key.pem` | Tesla vehicle command private key (**keep secret**) | `VEHICLE_COMMAND_PRIVATE_KEY_B64` |
+| `public-key.pem` | Tesla vehicle command public key | `TESLA_PUBLIC_KEY_BASE64` |
 
 ---
 
