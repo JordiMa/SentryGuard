@@ -2,12 +2,19 @@ import { getToken } from './token-manager';
 
 const DEFAULT_API_URL = 'http://localhost:3001';
 
-let cachedApiUrl: string | null = null;
-let fetchPromise: Promise<string> | null = null;
+interface RuntimeConfig {
+  apiUrl: string;
+  virtualKeyUrl: string;
+  rollbarClientToken: string;
+  discordUrl: string;
+}
 
-async function resolveApiUrl(): Promise<string> {
-  if (cachedApiUrl) {
-    return cachedApiUrl;
+let cachedConfig: RuntimeConfig | null = null;
+let fetchPromise: Promise<RuntimeConfig> | null = null;
+
+async function resolveRuntimeConfig(): Promise<RuntimeConfig> {
+  if (cachedConfig) {
+    return cachedConfig;
   }
 
   if (fetchPromise) {
@@ -16,19 +23,44 @@ async function resolveApiUrl(): Promise<string> {
 
   fetchPromise = fetch('/api/runtime-config')
     .then((res) => res.json())
-    .then((data: { apiUrl?: string }) => {
-      cachedApiUrl = data.apiUrl || DEFAULT_API_URL;
-      return cachedApiUrl;
+    .then((data: Partial<RuntimeConfig>) => {
+      cachedConfig = {
+        apiUrl: data.apiUrl || DEFAULT_API_URL,
+        virtualKeyUrl: data.virtualKeyUrl || '',
+        rollbarClientToken: data.rollbarClientToken || '',
+        discordUrl: data.discordUrl || '',
+      };
+      return cachedConfig;
     })
     .catch(() => {
-      cachedApiUrl = DEFAULT_API_URL;
-      return cachedApiUrl;
+      cachedConfig = { apiUrl: DEFAULT_API_URL, virtualKeyUrl: '', rollbarClientToken: '', discordUrl: '' };
+      return cachedConfig;
     })
     .finally(() => {
       fetchPromise = null;
     });
 
   return fetchPromise;
+}
+
+export async function resolveApiUrl(): Promise<string> {
+  const config = await resolveRuntimeConfig();
+  return config.apiUrl;
+}
+
+export async function resolveVirtualKeyUrl(): Promise<string> {
+  const config = await resolveRuntimeConfig();
+  return config.virtualKeyUrl;
+}
+
+export async function resolveRollbarClientToken(): Promise<string> {
+  const config = await resolveRuntimeConfig();
+  return config.rollbarClientToken;
+}
+
+export async function resolveDiscordUrl(): Promise<string> {
+  const config = await resolveRuntimeConfig();
+  return config.discordUrl;
 }
 
 export class ApiError extends Error {

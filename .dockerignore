@@ -1,8 +1,11 @@
 .git
 .github
+.vscode
+.idea
 node_modules
-dist
-.next
+**/dist
+**/.next
+**/out-tsc
 coverage
 out-tsc
 *.md
@@ -10,5 +13,7 @@ out-tsc
 .env
 .env.*
 !.env.docker
-.vscode
-.idea
+apps/api/.env
+apps/webapp/.env
+docs
+tmp
