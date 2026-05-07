@@ -16,9 +16,9 @@ FROM dependencies AS builder
 
 COPY . .
 
-RUN npx nx build api
-RUN npx nx copy-workspace-modules api
-RUN npx nx prune-lockfile api
+RUN NX_DAEMON=false npx nx build api
+RUN NX_DAEMON=false npx nx copy-workspace-modules api
+RUN NX_DAEMON=false npx nx prune-lockfile api
 
 RUN cd apps/api && npx tsc -p tsconfig.migrations.json && \
     mkdir -p dist/migrations && \
