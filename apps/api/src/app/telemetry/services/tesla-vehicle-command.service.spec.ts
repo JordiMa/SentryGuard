@@ -20,6 +20,10 @@ describe('The TeslaVehicleCommandService class', () => {
     service = module.get<TeslaVehicleCommandService>(TeslaVehicleCommandService);
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   describe('The flashLights() method', () => {
     describe('When no access token is available', () => {
       beforeEach(() => {
@@ -36,12 +40,14 @@ describe('The TeslaVehicleCommandService class', () => {
     describe('When access token is available', () => {
       beforeEach(() => {
         mockAccessTokenService.getAccessTokenForUserId.mockResolvedValue('valid-token');
+        jest.spyOn((service as any).teslaApi, 'post').mockResolvedValue({ data: { response: true } });
       });
 
       it('should attempt to send flash_lights command', async () => {
         const result = await service.flashLights('TESTVIN1234567890', 'user-1');
 
         expect(mockAccessTokenService.getAccessTokenForUserId).toHaveBeenCalledWith('user-1');
+        expect(result.success).toBe(true);
       });
     });
   });
@@ -62,12 +68,14 @@ describe('The TeslaVehicleCommandService class', () => {
     describe('When access token is available', () => {
       beforeEach(() => {
         mockAccessTokenService.getAccessTokenForUserId.mockResolvedValue('valid-token');
+        jest.spyOn((service as any).teslaApi, 'post').mockResolvedValue({ data: { response: true } });
       });
 
       it('should attempt to send honk command', async () => {
         const result = await service.honkHorn('TESTVIN1234567890', 'user-1');
 
         expect(mockAccessTokenService.getAccessTokenForUserId).toHaveBeenCalledWith('user-1');
+        expect(result.success).toBe(true);
       });
     });
   });
