@@ -155,6 +155,8 @@ describe('The BreakInAlertHandlerService class', () => {
 
       it('should trigger offensive response for the VIN', async () => {
         await service.handle(message);
+        jest.advanceTimersByTime(3000);
+        await Promise.resolve();
 
         expect(mockOffensiveResponseService.handleOffensiveResponse).toHaveBeenCalledWith('123');
       });
