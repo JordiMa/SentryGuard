@@ -117,7 +117,7 @@ describe('The TelegramOffensiveResponseService class', () => {
   describe('The onModuleInit() method', () => {
     it('should register hears and action handlers', () => {
       expect(mockBotService.registerHears).toHaveBeenCalledTimes(1);
-      expect(mockBotService.registerAction).toHaveBeenCalledTimes(8);
+      expect(mockBotService.registerAction).toHaveBeenCalledTimes(9);
     });
   });
 
@@ -158,8 +158,6 @@ describe('The TelegramOffensiveResponseService class', () => {
         await hearsHandler(ctx);
         expect(mockKeyboardBuilderService.buildOffensiveResponseKeyboard).toHaveBeenCalledWith(
           fakeVehicle.id,
-          fakeVehicle.sentry_offensive_response,
-          fakeVehicle.break_in_offensive_response,
           'en',
         );
       });
@@ -198,8 +196,6 @@ describe('The TelegramOffensiveResponseService class', () => {
 
         expect(mockKeyboardBuilderService.buildOffensiveResponseKeyboard).toHaveBeenCalledWith(
           fakeVehicle.id,
-          fakeVehicle.sentry_offensive_response,
-          fakeVehicle.break_in_offensive_response,
           'en',
         );
       });

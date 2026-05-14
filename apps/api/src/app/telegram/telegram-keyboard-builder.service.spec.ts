@@ -102,43 +102,47 @@ describe('The TelegramKeyboardBuilderService class', () => {
   });
 
   describe('The buildOffensiveResponseKeyboard() method', () => {
-    it('should return keyboard with sentry section, break-in section, and test button', () => {
-      const result = service.buildOffensiveResponseKeyboard('vehicle-1', OffensiveResponse.DISABLED, OffensiveResponse.HONK, 'en');
+    it('should return keyboard with two buttons: Sentry and Break-In', () => {
+      const result = service.buildOffensiveResponseKeyboard('vehicle-1', 'en');
 
       expect(result.keyboard).toBeDefined();
       const inlineKeyboard = result.keyboard?.inline_keyboard;
 
-      expect(inlineKeyboard).toHaveLength(7);
+      expect(inlineKeyboard).toHaveLength(2);
 
-      expect(inlineKeyboard?.[0]?.[0]?.callback_data).toBe('o_none:vehicle-1');
+      expect(inlineKeyboard?.[0]?.[0]?.callback_data).toBe('o_type:sentry:vehicle-1');
       expect(inlineKeyboard?.[0]?.[0]?.text).toContain('Sentry');
 
-      expect(inlineKeyboard?.[1]?.[0]?.callback_data).toBe(`o_ss:vehicle-1:${OffensiveResponse.DISABLED}`);
-      expect(inlineKeyboard?.[2]?.[0]?.callback_data).toBe(`o_ss:vehicle-1:${OffensiveResponse.HONK}`);
-
-      expect(inlineKeyboard?.[3]?.[0]?.callback_data).toBe('o_none:vehicle-1');
-      expect(inlineKeyboard?.[3]?.[0]?.text).toContain('Break-In');
-
-      expect(inlineKeyboard?.[4]?.[0]?.callback_data).toBe(`o_sb:vehicle-1:${OffensiveResponse.DISABLED}`);
-      expect(inlineKeyboard?.[5]?.[0]?.callback_data).toBe(`o_sb:vehicle-1:${OffensiveResponse.HONK}`);
-
-      expect(inlineKeyboard?.[6]?.[0]?.callback_data).toBe('o_t:vehicle-1');
+      expect(inlineKeyboard?.[1]?.[0]?.callback_data).toBe('o_type:break_in:vehicle-1');
+      expect(inlineKeyboard?.[1]?.[0]?.text).toContain('Break-In');
     });
+  });
 
-    it('should prefix the current sentry response with checkmark', () => {
-      const result = service.buildOffensiveResponseKeyboard('vehicle-1', OffensiveResponse.HONK, OffensiveResponse.DISABLED, 'en');
+  describe('The buildOffensiveTypeKeyboard() method', () => {
+    it('should return sentry options with checkmark on current value', () => {
+      const result = service.buildOffensiveTypeKeyboard('vehicle-1', 'sentry', OffensiveResponse.DISABLED, 'en');
+
+      expect(result.keyboard).toBeDefined();
       const inlineKeyboard = result.keyboard?.inline_keyboard;
 
-      expect(inlineKeyboard?.[1]?.[0]?.text).not.toContain('✅');
-      expect(inlineKeyboard?.[2]?.[0]?.text).toContain('✅');
+      expect(inlineKeyboard).toHaveLength(3);
+      expect(inlineKeyboard?.[0]?.[0]?.callback_data).toBe(`o_ss:vehicle-1:${OffensiveResponse.DISABLED}`);
+      expect(inlineKeyboard?.[0]?.[0]?.text).toContain('✅');
+      expect(inlineKeyboard?.[1]?.[0]?.callback_data).toBe(`o_ss:vehicle-1:${OffensiveResponse.HONK}`);
+      expect(inlineKeyboard?.[2]?.[0]?.callback_data).toBe('o_ts:vehicle-1');
     });
 
-    it('should prefix the current break-in response with checkmark', () => {
-      const result = service.buildOffensiveResponseKeyboard('vehicle-1', OffensiveResponse.DISABLED, OffensiveResponse.HONK, 'en');
+    it('should return break-in options with checkmark on current value', () => {
+      const result = service.buildOffensiveTypeKeyboard('vehicle-1', 'break_in', OffensiveResponse.HONK, 'en');
+
+      expect(result.keyboard).toBeDefined();
       const inlineKeyboard = result.keyboard?.inline_keyboard;
 
-      expect(inlineKeyboard?.[4]?.[0]?.text).not.toContain('✅');
-      expect(inlineKeyboard?.[5]?.[0]?.text).toContain('✅');
+      expect(inlineKeyboard).toHaveLength(3);
+      expect(inlineKeyboard?.[0]?.[0]?.callback_data).toBe(`o_sb:vehicle-1:${OffensiveResponse.DISABLED}`);
+      expect(inlineKeyboard?.[1]?.[0]?.callback_data).toBe(`o_sb:vehicle-1:${OffensiveResponse.HONK}`);
+      expect(inlineKeyboard?.[1]?.[0]?.text).toContain('✅');
+      expect(inlineKeyboard?.[2]?.[0]?.callback_data).toBe('o_tb:vehicle-1');
     });
   });
 });
