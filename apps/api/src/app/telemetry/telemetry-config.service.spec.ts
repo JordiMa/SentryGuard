@@ -193,6 +193,8 @@ describe('TelemetryConfigService', () => {
           vin: 'VIN123',
           display_name: 'Tesla Model 3',
           sentry_mode_monitoring_enabled: false,
+          sentry_offensive_response: 'DISABLED',
+          break_in_offensive_response: 'DISABLED',
         },
         { conflictPaths: ['userId', 'vin'], skipUpdateIfNoValuesChanged: true }
       );
@@ -223,6 +225,8 @@ describe('TelemetryConfigService', () => {
           vin: 'VIN123',
           display_name: 'Updated Name',
           sentry_mode_monitoring_enabled: false,
+          sentry_offensive_response: 'DISABLED',
+          break_in_offensive_response: 'DISABLED',
         },
         { conflictPaths: ['userId', 'vin'], skipUpdateIfNoValuesChanged: true }
       );
@@ -253,6 +257,8 @@ describe('TelemetryConfigService', () => {
           vin: 'VIN123',
           display_name: 'Tesla Model 3',
           sentry_mode_monitoring_enabled: true,
+          sentry_offensive_response: 'DISABLED',
+          break_in_offensive_response: 'DISABLED',
         },
         { conflictPaths: ['userId', 'vin'], skipUpdateIfNoValuesChanged: true }
       );
