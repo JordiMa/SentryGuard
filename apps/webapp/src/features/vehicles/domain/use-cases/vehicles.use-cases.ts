@@ -57,17 +57,26 @@ export class ToggleBreakInMonitoringUseCase implements ToggleBreakInMonitoringRe
 export class UpdateOffensiveResponseUseCase implements UpdateOffensiveResponseRequirements {
   constructor(private repository: VehicleRepositoryRequirements) {}
 
-  async execute(vin: string, offensiveResponse: string): Promise<GenericActionResponse> {
+  async execute(vin: string, sentryResponse?: string, breakInResponse?: string, sentryDurationMinutes?: number): Promise<GenericActionResponse> {
     if (!vin) throw new Error('VIN is required');
-    return this.repository.updateOffensiveResponse(vin, offensiveResponse);
+    return this.repository.updateOffensiveResponse(vin, sentryResponse, breakInResponse, sentryDurationMinutes);
   }
 }
 
-export class TestOffensiveResponseUseCase implements TestOffensiveResponseRequirements {
+export class TestSentryOffensiveResponseUseCase implements TestOffensiveResponseRequirements {
   constructor(private repository: VehicleRepositoryRequirements) {}
 
   async execute(vin: string): Promise<GenericActionResponse> {
     if (!vin) throw new Error('VIN is required');
-    return this.repository.testOffensiveResponse(vin);
+    return this.repository.testSentryOffensiveResponse(vin);
+  }
+}
+
+export class TestBreakInOffensiveResponseUseCase implements TestOffensiveResponseRequirements {
+  constructor(private repository: VehicleRepositoryRequirements) {}
+
+  async execute(vin: string): Promise<GenericActionResponse> {
+    if (!vin) throw new Error('VIN is required');
+    return this.repository.testBreakInOffensiveResponse(vin);
   }
 }
