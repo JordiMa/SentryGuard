@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TelegramConfig, TelegramLinkStatus } from '../../entities/telegram-config.entity';
@@ -9,8 +9,6 @@ import i18n from '../../i18n';
 
 @Injectable()
 export class OffensiveNotificationService {
-  private readonly logger = new Logger(OffensiveNotificationService.name);
-
   constructor(
     @InjectRepository(TelegramConfig)
     private readonly telegramConfigRepository: Repository<TelegramConfig>,
@@ -26,21 +24,27 @@ export class OffensiveNotificationService {
     const vehicleName = vehicle.display_name || vehicle.vin;
     const durationLabel = this.formatDuration(durationMinutes, lng);
 
+    const chatId = config.chat_id;
+    if (!chatId) return;
+
     const message = i18n.t('offensiveActivatedForSentry', { lng, vehicle: vehicleName, duration: durationLabel });
 
-    await this.telegramBotService.sendMessage(config.chat_id, message);
+    await this.telegramBotService.sendMessage(chatId, message);
   }
 
   async notifyDeactivated(vehicle: Vehicle): Promise<void> {
     const config = await this.findLinkedConfig(vehicle.userId);
     if (!config) return;
 
+    const chatId = config.chat_id;
+    if (!chatId) return;
+
     const lng = await this.userLanguageService.getUserLanguage(config.userId);
     const vehicleName = vehicle.display_name || vehicle.vin;
 
     const message = i18n.t('offensiveDeactivatedAutoSentry', { lng, vehicle: vehicleName });
 
-    await this.telegramBotService.sendMessage(config.chat_id, message);
+    await this.telegramBotService.sendMessage(chatId, message);
   }
 
   private formatDuration(minutes: number, lng: 'en' | 'fr'): string {

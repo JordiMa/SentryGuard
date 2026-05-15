@@ -204,7 +204,7 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
     const result = await this.vehicleOffensiveResponseService.setSentryOffensiveWithDuration(config.userId, vehicle.vin, durationMinutes, true);
 
     if (!result.success) {
-      await ctx.answerCbQuery({ text: i18n.t('offensiveError', { lng }), show_alert: true });
+      await this.answerCbQuery(ctx, i18n.t('offensiveError', { lng }), true);
       return;
     }
 
@@ -239,7 +239,7 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
     const result = await this.vehicleOffensiveResponseService.disableSentryOffensive(config.userId, vehicle.vin);
 
     if (!result.success) {
-      await ctx.answerCbQuery({ text: i18n.t('offensiveError', { lng }), show_alert: true });
+      await this.answerCbQuery(ctx, i18n.t('offensiveError', { lng }), true);
       return;
     }
 
@@ -294,11 +294,11 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
     const responseValue = alertType === 'sentry' ? vehicle.sentry_offensive_response : vehicle.break_in_offensive_response;
 
     if (responseValue === OffensiveResponse.DISABLED) {
-      await ctx.answerCbQuery({ text: i18n.t('offensiveTestDisabled', { lng }), show_alert: true });
+      await this.answerCbQuery(ctx, i18n.t('offensiveTestDisabled', { lng }), true);
       return;
     }
 
-    await ctx.answerCbQuery({ text: `⚡ ${i18n.t('offensiveTestTriggered', { lng })}` });
+    await this.answerCbQuery(ctx, `⚡ ${i18n.t('offensiveTestTriggered', { lng })}`);
 
     this.logger.log(`[OFFENSIVE] Test ${alertType} response triggered via Telegram for VIN ${vehicle.vin}`);
 
@@ -348,6 +348,10 @@ export class TelegramOffensiveResponseService implements OnModuleInit {
       where: { userId },
       order: { created_at: 'ASC' },
     });
+  }
+
+  private async answerCbQuery(ctx: Context, text: string, showAlert = false): Promise<void> {
+    await ctx.answerCbQuery({ text, show_alert: showAlert } as unknown as string);
   }
 
   private async safeReply(ctx: Context, message: string, options?: TelegramMessageOptions): Promise<void> {
