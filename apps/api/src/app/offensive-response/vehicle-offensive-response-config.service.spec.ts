@@ -168,22 +168,58 @@ describe('The VehicleOffensiveResponseConfigService class', () => {
   });
 
   describe('The testSentryOffensiveResponse() method', () => {
-    it('should delegate to handleSentryOffensiveResponse', async () => {
-      mockOffensiveResponseService.handleSentryOffensiveResponse.mockResolvedValue(undefined);
+    describe('When vehicle belongs to user', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne.mockResolvedValue({ userId: 'user-1', vin: 'VIN123' } as Vehicle);
+        mockOffensiveResponseService.handleSentryOffensiveResponse.mockResolvedValue(undefined);
+      });
 
-      await service.testSentryOffensiveResponse('VIN123');
+      it('should delegate to handleSentryOffensiveResponse', async () => {
+        await service.testSentryOffensiveResponse('user-1', 'VIN123');
 
-      expect(mockOffensiveResponseService.handleSentryOffensiveResponse).toHaveBeenCalledWith('VIN123');
+        expect(mockVehicleRepository.findOne).toHaveBeenCalledWith({ where: { userId: 'user-1', vin: 'VIN123' } });
+        expect(mockOffensiveResponseService.handleSentryOffensiveResponse).toHaveBeenCalledWith('VIN123');
+      });
+    });
+
+    describe('When vehicle does not belong to user', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne.mockResolvedValue(null);
+      });
+
+      it('should not trigger offensive response', async () => {
+        await service.testSentryOffensiveResponse('user-1', 'VIN123');
+
+        expect(mockOffensiveResponseService.handleSentryOffensiveResponse).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe('The testBreakInOffensiveResponse() method', () => {
-    it('should delegate to handleBreakInOffensiveResponse', async () => {
-      mockOffensiveResponseService.handleBreakInOffensiveResponse.mockResolvedValue(undefined);
+    describe('When vehicle belongs to user', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne.mockResolvedValue({ userId: 'user-1', vin: 'VIN123' } as Vehicle);
+        mockOffensiveResponseService.handleBreakInOffensiveResponse.mockResolvedValue(undefined);
+      });
 
-      await service.testBreakInOffensiveResponse('VIN123');
+      it('should delegate to handleBreakInOffensiveResponse', async () => {
+        await service.testBreakInOffensiveResponse('user-1', 'VIN123');
 
-      expect(mockOffensiveResponseService.handleBreakInOffensiveResponse).toHaveBeenCalledWith('VIN123');
+        expect(mockVehicleRepository.findOne).toHaveBeenCalledWith({ where: { userId: 'user-1', vin: 'VIN123' } });
+        expect(mockOffensiveResponseService.handleBreakInOffensiveResponse).toHaveBeenCalledWith('VIN123');
+      });
+    });
+
+    describe('When vehicle does not belong to user', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne.mockResolvedValue(null);
+      });
+
+      it('should not trigger offensive response', async () => {
+        await service.testBreakInOffensiveResponse('user-1', 'VIN123');
+
+        expect(mockOffensiveResponseService.handleBreakInOffensiveResponse).not.toHaveBeenCalled();
+      });
     });
   });
 });

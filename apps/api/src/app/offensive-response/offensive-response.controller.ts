@@ -87,7 +87,7 @@ export class OffensiveResponseController {
   ) {
     const userId = user.userId;
     this.logger.log(`Testing sentry offensive response for VIN: ${vin} (user: ${userId})`);
-    await this.vehicleOffensiveResponseConfigService.testSentryOffensiveResponse(vin);
+    await this.vehicleOffensiveResponseConfigService.testSentryOffensiveResponse(userId, vin);
     return { message: `Sentry offensive response test triggered for VIN: ${vin}` };
   }
 
@@ -99,7 +99,7 @@ export class OffensiveResponseController {
   ) {
     const userId = user.userId;
     this.logger.log(`Testing break-in offensive response for VIN: ${vin} (user: ${userId})`);
-    await this.vehicleOffensiveResponseConfigService.testBreakInOffensiveResponse(vin);
+    await this.vehicleOffensiveResponseConfigService.testBreakInOffensiveResponse(userId, vin);
     return { message: `Break-in offensive response test triggered for VIN: ${vin}` };
   }
 }

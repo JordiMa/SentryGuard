@@ -98,11 +98,25 @@ export class VehicleOffensiveResponseConfigService {
     });
   }
 
-  async testSentryOffensiveResponse(vin: string): Promise<void> {
+  async testSentryOffensiveResponse(userId: string, vin: string): Promise<void> {
+    const vehicle = await this.vehicleRepository.findOne({ where: { userId, vin } });
+
+    if (!vehicle) {
+      this.logger.warn(`[OFFENSIVE] Test sentry: no vehicle found for user ${userId} and VIN ${vin}`);
+      return;
+    }
+
     await this.offensiveResponseService.handleSentryOffensiveResponse(vin);
   }
 
-  async testBreakInOffensiveResponse(vin: string): Promise<void> {
+  async testBreakInOffensiveResponse(userId: string, vin: string): Promise<void> {
+    const vehicle = await this.vehicleRepository.findOne({ where: { userId, vin } });
+
+    if (!vehicle) {
+      this.logger.warn(`[OFFENSIVE] Test break-in: no vehicle found for user ${userId} and VIN ${vin}`);
+      return;
+    }
+
     await this.offensiveResponseService.handleBreakInOffensiveResponse(vin);
   }
 }

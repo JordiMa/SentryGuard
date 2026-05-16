@@ -151,7 +151,7 @@ describe('The OffensiveResponseController class', () => {
 
       const result = await controller.testSentryOffensiveResponse('VIN123', mockUser);
 
-      expect(mockService.testSentryOffensiveResponse).toHaveBeenCalledWith('VIN123');
+      expect(mockService.testSentryOffensiveResponse).toHaveBeenCalledWith('test-user-id', 'VIN123');
       expect(result).toStrictEqual({
         message: 'Sentry offensive response test triggered for VIN: VIN123',
       });
@@ -164,7 +164,7 @@ describe('The OffensiveResponseController class', () => {
 
       const result = await controller.testBreakInOffensiveResponse('VIN123', mockUser);
 
-      expect(mockService.testBreakInOffensiveResponse).toHaveBeenCalledWith('VIN123');
+      expect(mockService.testBreakInOffensiveResponse).toHaveBeenCalledWith('test-user-id', 'VIN123');
       expect(result).toStrictEqual({
         message: 'Break-in offensive response test triggered for VIN: VIN123',
       });
