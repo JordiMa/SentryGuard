@@ -75,6 +75,11 @@ export class TeslaTokenRefreshService {
         return RefreshResult.AuthenticationExpired;
       }
 
+      if (user.expires_at && new Date() < user.expires_at) {
+        this.logger.debug(`Token already refreshed by another request for user: ${userId}`);
+        return RefreshResult.AlreadyRefreshed;
+      }
+
       const decryptedRefreshToken = this.decryptRefreshTokenSafely(user);
 
       if (!decryptedRefreshToken) {
