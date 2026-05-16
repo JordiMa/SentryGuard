@@ -27,6 +27,11 @@ export class AlertsOffensiveResponseService {
         continue;
       }
 
+      if (vehicle.sentry_offensive_response_until && new Date() > vehicle.sentry_offensive_response_until) {
+        this.logger.debug(`[OFFENSIVE] Sentry offensive response expired for VIN ${vin} and userId ${userId}`);
+        continue;
+      }
+
       if (!vehicle.sentry_mode_monitoring_enabled) {
         continue;
       }

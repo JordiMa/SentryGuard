@@ -103,6 +103,64 @@ describe('The AlertsOffensiveResponseService class', () => {
       });
     });
 
+    describe('When sentry offensive response is expired', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne.mockResolvedValue({
+          ...fakeVehicle,
+          sentry_offensive_response: OffensiveResponse.HONK,
+          sentry_offensive_response_until: new Date('2020-01-01'),
+        });
+      });
+
+      it('should not trigger any command', async () => {
+        await service.handleSentryOffensiveResponse('5YJ3E1EA123456789', ['user-1']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('When sentry offensive response is not yet expired', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne.mockResolvedValue({
+          ...fakeVehicle,
+          sentry_offensive_response: OffensiveResponse.HONK,
+          sentry_offensive_response_until: new Date(Date.now() + 60 * 60 * 1000),
+        });
+        mockTeslaVehicleCommandService.honkHorn.mockResolvedValue({ success: true });
+      });
+
+      it('should trigger honk horn', async () => {
+        await service.handleSentryOffensiveResponse('5YJ3E1EA123456789', ['user-1']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-1');
+      });
+    });
+
+    describe('When first userId has expired response and second userId is HONK', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-1',
+            sentry_offensive_response: OffensiveResponse.HONK,
+            sentry_offensive_response_until: new Date('2020-01-01'),
+          })
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-2',
+            sentry_offensive_response: OffensiveResponse.HONK,
+            sentry_offensive_response_until: new Date(Date.now() + 60 * 60 * 1000),
+          });
+        mockTeslaVehicleCommandService.honkHorn.mockResolvedValue({ success: true });
+      });
+
+      it('should trigger honk horn for the second userId', async () => {
+        await service.handleSentryOffensiveResponse('5YJ3E1EA123456789', ['user-1', 'user-2']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-2');
+      });
+    });
+
     describe('When first userId is disabled and second userId is HONK', () => {
       beforeEach(() => {
         mockVehicleRepository.findOne
