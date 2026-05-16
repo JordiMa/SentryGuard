@@ -36,8 +36,10 @@ export class AlertsOffensiveResponseService {
         continue;
       }
 
-      await this.executeOffensiveResponse(vehicle);
-      return;
+      const success = await this.executeOffensiveResponse(vehicle);
+      if (success) {
+        return;
+      }
     }
 
     this.logger.debug(`[OFFENSIVE] No eligible user found for sentry offensive response on VIN ${vin}`);
@@ -59,8 +61,10 @@ export class AlertsOffensiveResponseService {
         continue;
       }
 
-      await this.executeOffensiveResponse(vehicle);
-      return;
+      const success = await this.executeOffensiveResponse(vehicle);
+      if (success) {
+        return;
+      }
     }
 
     this.logger.debug(`[OFFENSIVE] No eligible user found for break-in offensive response on VIN ${vin}`);
@@ -70,7 +74,7 @@ export class AlertsOffensiveResponseService {
     return this.vehicleRepository.findOne({ where: { vin, userId } });
   }
 
-  private async executeOffensiveResponse(vehicle: Vehicle): Promise<void> {
+  private async executeOffensiveResponse(vehicle: Vehicle): Promise<boolean> {
     const { vin, userId } = vehicle;
 
     try {
@@ -78,11 +82,14 @@ export class AlertsOffensiveResponseService {
 
       if (result.success) {
         this.logger.log(`[OFFENSIVE] Honk horn triggered for VIN ${vin}`);
-      } else {
-        this.logger.warn(`[OFFENSIVE] Honk horn failed for VIN ${vin}: ${result.message}`);
+        return true;
       }
+
+      this.logger.warn(`[OFFENSIVE] Honk horn failed for VIN ${vin}: ${result.message}`);
+      return false;
     } catch (error: unknown) {
       this.logger.error(`[OFFENSIVE] Error triggering honk horn for VIN ${vin}`, error);
+      return false;
     }
   }
 }

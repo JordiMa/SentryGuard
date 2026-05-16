@@ -208,6 +208,83 @@ describe('The AlertsOffensiveResponseService class', () => {
       });
     });
 
+    describe('When first userId is eligible but honk fails and second userId is eligible', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-1',
+            sentry_offensive_response: OffensiveResponse.HONK,
+          })
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-2',
+            sentry_offensive_response: OffensiveResponse.HONK,
+          });
+        mockTeslaVehicleCommandService.honkHorn
+          .mockResolvedValueOnce({ success: false, message: 'vehicle_cmds scope missing' })
+          .mockResolvedValueOnce({ success: true });
+      });
+
+      it('should try second userId when first fails', async () => {
+        await service.handleSentryOffensiveResponse('5YJ3E1EA123456789', ['user-1', 'user-2']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledTimes(2);
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-1');
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-2');
+      });
+    });
+
+    describe('When first userId is eligible but honk throws and second userId is eligible', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-1',
+            sentry_offensive_response: OffensiveResponse.HONK,
+          })
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-2',
+            sentry_offensive_response: OffensiveResponse.HONK,
+          });
+        mockTeslaVehicleCommandService.honkHorn
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockResolvedValueOnce({ success: true });
+      });
+
+      it('should try second userId when first throws', async () => {
+        await service.handleSentryOffensiveResponse('5YJ3E1EA123456789', ['user-1', 'user-2']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledTimes(2);
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-1');
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-2');
+      });
+    });
+
+    describe('When all eligible userIds fail honk', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-1',
+            sentry_offensive_response: OffensiveResponse.HONK,
+          })
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-2',
+            sentry_offensive_response: OffensiveResponse.HONK,
+          });
+        mockTeslaVehicleCommandService.honkHorn.mockResolvedValue({ success: false, message: 'error' });
+      });
+
+      it('should not trigger any successful command', async () => {
+        await service.handleSentryOffensiveResponse('5YJ3E1EA123456789', ['user-1', 'user-2']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledTimes(2);
+      });
+    });
+
     describe('When empty userIds array', () => {
       it('should not trigger any command', async () => {
         await service.handleSentryOffensiveResponse('5YJ3E1EA123456789', []);
@@ -321,6 +398,83 @@ describe('The AlertsOffensiveResponseService class', () => {
         await service.handleBreakInOffensiveResponse('5YJ3E1EA123456789', ['user-1', 'user-2']);
 
         expect(mockTeslaVehicleCommandService.honkHorn).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('When first userId is eligible but honk fails and second userId is eligible', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-1',
+            break_in_offensive_response: OffensiveResponse.HONK,
+          })
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-2',
+            break_in_offensive_response: OffensiveResponse.HONK,
+          });
+        mockTeslaVehicleCommandService.honkHorn
+          .mockResolvedValueOnce({ success: false, message: 'vehicle_cmds scope missing' })
+          .mockResolvedValueOnce({ success: true });
+      });
+
+      it('should try second userId when first fails', async () => {
+        await service.handleBreakInOffensiveResponse('5YJ3E1EA123456789', ['user-1', 'user-2']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledTimes(2);
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-1');
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-2');
+      });
+    });
+
+    describe('When first userId is eligible but honk throws and second userId is eligible', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-1',
+            break_in_offensive_response: OffensiveResponse.HONK,
+          })
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-2',
+            break_in_offensive_response: OffensiveResponse.HONK,
+          });
+        mockTeslaVehicleCommandService.honkHorn
+          .mockRejectedValueOnce(new Error('Network error'))
+          .mockResolvedValueOnce({ success: true });
+      });
+
+      it('should try second userId when first throws', async () => {
+        await service.handleBreakInOffensiveResponse('5YJ3E1EA123456789', ['user-1', 'user-2']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledTimes(2);
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-1');
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledWith('5YJ3E1EA123456789', 'user-2');
+      });
+    });
+
+    describe('When all eligible userIds fail honk', () => {
+      beforeEach(() => {
+        mockVehicleRepository.findOne
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-1',
+            break_in_offensive_response: OffensiveResponse.HONK,
+          })
+          .mockResolvedValueOnce({
+            ...fakeVehicle,
+            userId: 'user-2',
+            break_in_offensive_response: OffensiveResponse.HONK,
+          });
+        mockTeslaVehicleCommandService.honkHorn.mockResolvedValue({ success: false, message: 'error' });
+      });
+
+      it('should not trigger any successful command', async () => {
+        await service.handleBreakInOffensiveResponse('5YJ3E1EA123456789', ['user-1', 'user-2']);
+
+        expect(mockTeslaVehicleCommandService.honkHorn).toHaveBeenCalledTimes(2);
       });
     });
 
