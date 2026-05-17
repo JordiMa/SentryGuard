@@ -4,7 +4,7 @@ import * as https from 'https';
 import { AccessTokenService } from '../../auth/services/access-token.service';
 import { DEFAULT_TESLA_API_BASE_URL } from '../telemetry-config.constants';
 
-export interface TeslaCommandResponse {
+interface TeslaCommandResponse {
   success: boolean;
   message?: string;
 }
@@ -21,10 +21,6 @@ export class TeslaVehicleCommandService {
   constructor(
     private readonly accessTokenService: AccessTokenService,
   ) {}
-
-  async flashLights(vin: string, userId: string): Promise<TeslaCommandResponse> {
-    return this.sendVehicleCommand(vin, userId, 'flash_lights');
-  }
 
   async honkHorn(vin: string, userId: string): Promise<TeslaCommandResponse> {
     return this.sendVehicleCommand(vin, userId, 'honk_horn');

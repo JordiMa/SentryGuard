@@ -6,7 +6,8 @@ import { TelegramOffensiveResponseService } from './telegram-offensive-response.
 import { TelegramBotService } from './telegram-bot.service';
 import { TelegramKeyboardBuilderService } from './telegram-keyboard-builder.service';
 import { TelegramContextService } from './telegram-context.service';
-import { OffensiveResponseService } from '../alerts/services/offensive-response.service';
+import { AlertsOffensiveResponseService } from '../offensive-response/alerts-offensive-response.service';
+import { VehicleOffensiveResponseConfigService } from '../offensive-response/vehicle-offensive-response-config.service';
 import { TelegramConfig, TelegramLinkStatus } from '../../entities/telegram-config.entity';
 import { Vehicle } from '../../entities/vehicle.entity';
 import { OffensiveResponse } from '../alerts/enums/offensive-response.enum';
@@ -21,9 +22,10 @@ describe('The TelegramOffensiveResponseService class', () => {
   const fakeUserId = 'user-123';
 
   let service: TelegramOffensiveResponseService;
-  let hearsHandler: (ctx: Context) => Promise<void>;
+  let hearsSentryHandler: (ctx: Context) => Promise<void>;
   let selectHandler: (ctx: Context) => Promise<void>;
-  let setHandler: (ctx: Context) => Promise<void>;
+  let setSentryHandler: (ctx: Context) => Promise<void>;
+  let setBreakInHandler: (ctx: Context) => Promise<void>;
 
   const mockTelegramConfigRepository = {
     findOne: jest.fn(),
@@ -36,7 +38,8 @@ describe('The TelegramOffensiveResponseService class', () => {
   const mockBotService: MockProxy<TelegramBotService> = mock<TelegramBotService>();
   const mockKeyboardBuilderService: MockProxy<TelegramKeyboardBuilderService> = mock<TelegramKeyboardBuilderService>();
   const mockContextService: MockProxy<TelegramContextService> = mock<TelegramContextService>();
-  const mockOffensiveResponseService: MockProxy<OffensiveResponseService> = mock<OffensiveResponseService>();
+  const mockOffensiveResponseService: MockProxy<AlertsOffensiveResponseService> = mock<AlertsOffensiveResponseService>();
+  const mockVehicleOffensiveResponseConfigService: MockProxy<VehicleOffensiveResponseConfigService> = mock<VehicleOffensiveResponseConfigService>();
 
   const fakeVehicle: Vehicle = {
     id: 'vehicle-1',
@@ -45,20 +48,22 @@ describe('The TelegramOffensiveResponseService class', () => {
     display_name: 'Model 3',
     sentry_mode_monitoring_enabled: true,
     break_in_monitoring_enabled: false,
-    offensive_response: OffensiveResponse.DISABLED,
+    sentry_offensive_response: OffensiveResponse.DISABLED,
+    break_in_offensive_response: OffensiveResponse.DISABLED,
     created_at: new Date(),
     updated_at: new Date(),
     user: null,
   };
 
   const fakeConfig: TelegramConfig = {
+    bot_ui_version: 0, user: undefined,
     id: 'config-1',
     userId: fakeUserId,
     chat_id: fakeChatId,
     link_token: 'token',
     status: TelegramLinkStatus.LINKED,
     created_at: new Date(),
-    updated_at: new Date(),
+    updated_at: new Date()
   };
 
   const buildCtx = (chatId = fakeChatId, match?: string[]): Context =>
@@ -73,21 +78,29 @@ describe('The TelegramOffensiveResponseService class', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    mockBotService.registerHears.mockImplementation((_, handler) => { hearsHandler = handler; });
+    mockBotService.registerHears.mockImplementation((_, handler) => {
+      if (!hearsSentryHandler) {
+        hearsSentryHandler = handler;
+      }
+    });
     mockBotService.registerAction.mockImplementation((trigger, handler) => {
       if (typeof trigger === 'string') {
         if (trigger === 'o_sl:vehicle-1') selectHandler = handler;
       } else {
         const pattern = trigger.toString();
         if (pattern.includes('o_sl')) selectHandler = handler;
-        else if (pattern.includes('o_s:')) setHandler = handler;
+        else if (pattern.includes('o_ss')) setSentryHandler = handler;
+        else if (pattern.includes('o_sb')) setBreakInHandler = handler;
       }
     });
     mockContextService.getUserLanguageFromChatId.mockResolvedValue('en');
     mockKeyboardBuilderService.buildMainMenuKeyboard.mockReturnValue({});
-    mockKeyboardBuilderService.buildOffensiveResponseKeyboard.mockReturnValue({});
-    mockKeyboardBuilderService.buildVehicleSelectionKeyboard.mockReturnValue({});
+    mockKeyboardBuilderService.buildOffensiveTypeKeyboard.mockReturnValue({});
+    mockKeyboardBuilderService.buildDurationKeyboard.mockReturnValue({});
+    mockKeyboardBuilderService.buildActiveSentryKeyboard.mockReturnValue({});
     mockVehicleRepository.save.mockImplementation(async (v) => v);
+    mockVehicleOffensiveResponseConfigService.setSentryOffensiveWithDuration.mockResolvedValue({ success: true, sentry_offensive_response: OffensiveResponse.HONK });
+    mockVehicleOffensiveResponseConfigService.disableSentryOffensive.mockResolvedValue({ success: true, sentry_offensive_response: OffensiveResponse.DISABLED });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -97,7 +110,8 @@ describe('The TelegramOffensiveResponseService class', () => {
         { provide: TelegramBotService, useValue: mockBotService },
         { provide: TelegramKeyboardBuilderService, useValue: mockKeyboardBuilderService },
         { provide: TelegramContextService, useValue: mockContextService },
-        { provide: OffensiveResponseService, useValue: mockOffensiveResponseService },
+        { provide: AlertsOffensiveResponseService, useValue: mockOffensiveResponseService },
+        { provide: VehicleOffensiveResponseConfigService, useValue: mockVehicleOffensiveResponseConfigService },
       ],
     }).compile();
 
@@ -107,12 +121,12 @@ describe('The TelegramOffensiveResponseService class', () => {
 
   describe('The onModuleInit() method', () => {
     it('should register hears and action handlers', () => {
-      expect(mockBotService.registerHears).toHaveBeenCalledTimes(1);
-      expect(mockBotService.registerAction).toHaveBeenCalledTimes(3);
+      expect(mockBotService.registerHears).toHaveBeenCalledTimes(2);
+      expect(mockBotService.registerAction).toHaveBeenCalledTimes(8);
     });
   });
 
-  describe('When the offensive button is pressed', () => {
+  describe('When the Sentry button is pressed', () => {
     describe('When user has no linked config', () => {
       beforeEach(() => {
         mockTelegramConfigRepository.findOne.mockResolvedValue(null);
@@ -120,7 +134,7 @@ describe('The TelegramOffensiveResponseService class', () => {
 
       it('should reply with no account linked message', async () => {
         const ctx = buildCtx();
-        await hearsHandler(ctx);
+        await hearsSentryHandler(ctx);
         expect(ctx.reply).toHaveBeenCalledWith('No account linked', undefined);
       });
     });
@@ -133,7 +147,7 @@ describe('The TelegramOffensiveResponseService class', () => {
 
       it('should reply with no vehicles message', async () => {
         const ctx = buildCtx();
-        await hearsHandler(ctx);
+        await hearsSentryHandler(ctx);
         expect(ctx.reply).toHaveBeenCalledWith('offensiveNoVehicles', undefined);
       });
     });
@@ -144,12 +158,13 @@ describe('The TelegramOffensiveResponseService class', () => {
         mockVehicleRepository.find.mockResolvedValue([fakeVehicle]);
       });
 
-      it('should show response options directly', async () => {
+      it('should show sentry type options directly', async () => {
         const ctx = buildCtx();
-        await hearsHandler(ctx);
-        expect(mockKeyboardBuilderService.buildOffensiveResponseKeyboard).toHaveBeenCalledWith(
+        await hearsSentryHandler(ctx);
+        expect(mockKeyboardBuilderService.buildOffensiveTypeKeyboard).toHaveBeenCalledWith(
           fakeVehicle.id,
-          fakeVehicle.offensive_response,
+          'sentry',
+          fakeVehicle.sentry_offensive_response,
           'en',
         );
       });
@@ -163,12 +178,12 @@ describe('The TelegramOffensiveResponseService class', () => {
         mockVehicleRepository.find.mockResolvedValue([fakeVehicle, secondVehicle]);
       });
 
-      it('should show vehicle selection keyboard', async () => {
+      it('should show vehicle selection keyboard with sentry prefix', async () => {
         const ctx = buildCtx();
-        await hearsHandler(ctx);
+        await hearsSentryHandler(ctx);
         expect(mockKeyboardBuilderService.buildVehicleSelectionKeyboard).toHaveBeenCalledWith(
           [fakeVehicle, secondVehicle],
-          'offensive',
+          'sentry',
         );
       });
     });
@@ -182,33 +197,62 @@ describe('The TelegramOffensiveResponseService class', () => {
         mockContextService.getUserLanguageFromChatId.mockResolvedValue('en');
       });
 
-      it('should show response options for that vehicle', async () => {
-        const ctx = buildCtx(fakeChatId, ['o_sl:vehicle-1', 'vehicle-1']);
+      it('should show type options for that vehicle', async () => {
+        const ctx = buildCtx(fakeChatId, ['o_sl:sentry:vehicle-1', 'sentry', 'vehicle-1']);
         await selectHandler(ctx);
 
-        expect(mockKeyboardBuilderService.buildOffensiveResponseKeyboard).toHaveBeenCalledWith(
+        expect(mockKeyboardBuilderService.buildOffensiveTypeKeyboard).toHaveBeenCalledWith(
           fakeVehicle.id,
-          fakeVehicle.offensive_response,
+          'sentry',
+          fakeVehicle.sentry_offensive_response,
           'en',
         );
       });
     });
   });
 
-  describe('When an offensive response is set', () => {
+  describe('When a sentry offensive response is set', () => {
+    beforeEach(() => {
+      mockTelegramConfigRepository.findOne.mockResolvedValue(fakeConfig);
+      mockVehicleRepository.findOne.mockResolvedValue({ ...fakeVehicle });
+    });
+
+    it('should show duration keyboard when HONK is selected', async () => {
+      const ctx = buildCtx(fakeChatId, ['o_ss:vehicle-1:HONK', 'vehicle-1', 'HONK']);
+
+      await setSentryHandler(ctx);
+
+      expect(mockKeyboardBuilderService.buildDurationKeyboard).toHaveBeenCalledWith('vehicle-1', 'en');
+    });
+
+    it('should disable sentry response when DISABLED is selected', async () => {
+      const ctx = buildCtx(fakeChatId, ['o_ss:vehicle-1:DISABLED', 'vehicle-1', 'DISABLED']);
+
+      await setSentryHandler(ctx);
+
+      expect(mockVehicleRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sentry_offensive_response: OffensiveResponse.DISABLED,
+          sentry_offensive_response_until: null,
+        }),
+      );
+    });
+  });
+
+  describe('When a break-in offensive response is set', () => {
     beforeEach(() => {
       mockTelegramConfigRepository.findOne.mockResolvedValue(fakeConfig);
       mockVehicleRepository.findOne.mockResolvedValue({ ...fakeVehicle });
       mockVehicleRepository.save.mockImplementation(async (v) => v);
     });
 
-    it('should update the vehicle offensive_response and confirm', async () => {
-      const ctx = buildCtx(fakeChatId, ['o_s:vehicle-1:FLASH', 'vehicle-1', 'FLASH']);
+    it('should update the vehicle break_in_offensive_response and confirm', async () => {
+      const ctx = buildCtx(fakeChatId, ['o_sb:vehicle-1:HONK', 'vehicle-1', 'HONK']);
 
-      await setHandler(ctx);
+      await setBreakInHandler(ctx);
 
       expect(mockVehicleRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ offensive_response: OffensiveResponse.FLASH }),
+        expect.objectContaining({ break_in_offensive_response: OffensiveResponse.HONK }),
       );
     });
   });

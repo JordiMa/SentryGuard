@@ -17,6 +17,8 @@ export interface VehiclesQueryDependencies {
   toggleBreakInMonitoringUseCase: ToggleBreakInMonitoringRequirements;
   updateOffensiveResponseUseCase: UpdateOffensiveResponseRequirements;
   testOffensiveResponseUseCase: TestOffensiveResponseRequirements;
+  testSentryOffensiveResponseUseCase: TestOffensiveResponseRequirements;
+  testBreakInOffensiveResponseUseCase: TestOffensiveResponseRequirements;
 }
 
 export const createUseVehiclesQuery = (deps: VehiclesQueryDependencies) => () => {
@@ -81,19 +83,25 @@ export const createUseVehiclesQuery = (deps: VehiclesQueryDependencies) => () =>
   });
 
   const updateOffensiveResponseMutation = useMutation({
-    mutationFn: async ({ vin, offensiveResponse }: { vin: string; offensiveResponse: string }) => {
-      const result = await deps.updateOffensiveResponseUseCase.execute(vin, offensiveResponse);
+    mutationFn: async ({ vin, sentryResponse, breakInResponse, sentryDuration }: { vin: string; sentryResponse?: string; breakInResponse?: string; sentryDuration?: number }) => {
+      const result = await deps.updateOffensiveResponseUseCase.execute(vin, sentryResponse, breakInResponse, sentryDuration);
       if (!result.success) throw new Error(result.message);
-      return true;
+      return result;
     },
     onSuccess: () => {
       return queryClient.invalidateQueries({ queryKey: ['vehicles'] });
     },
   });
 
-  const testOffensiveResponseMutation = useMutation({
+  const testSentryOffensiveResponseMutation = useMutation({
     mutationFn: async (vin: string) => {
-      return deps.testOffensiveResponseUseCase.execute(vin);
+      return deps.testSentryOffensiveResponseUseCase.execute(vin);
+    },
+  });
+
+  const testBreakInOffensiveResponseMutation = useMutation({
+    mutationFn: async (vin: string) => {
+      return deps.testBreakInOffensiveResponseUseCase.execute(vin);
     },
   });
 
@@ -103,6 +111,7 @@ export const createUseVehiclesQuery = (deps: VehiclesQueryDependencies) => () =>
     deleteTelemetryMutation,
     toggleBreakInMutation,
     updateOffensiveResponseMutation,
-    testOffensiveResponseMutation,
+    testSentryOffensiveResponseMutation,
+    testBreakInOffensiveResponseMutation,
   };
 };

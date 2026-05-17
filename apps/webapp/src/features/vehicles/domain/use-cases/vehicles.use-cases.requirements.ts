@@ -21,7 +21,7 @@ export interface ToggleBreakInMonitoringRequirements {
 }
 
 export interface UpdateOffensiveResponseRequirements {
-  execute(vin: string, offensiveResponse: string): Promise<GenericActionResponse>;
+  execute(vin: string, sentryResponse?: string, breakInResponse?: string, sentryDurationMinutes?: number): Promise<GenericActionResponse>;
 }
 
 export interface TestOffensiveResponseRequirements {
