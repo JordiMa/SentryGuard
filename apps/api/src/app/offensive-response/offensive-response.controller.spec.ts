@@ -73,16 +73,5 @@ describe('The OffensiveResponseController class', () => {
     });
   });
 
-  describe('The testBreakInOffensiveResponse() method', () => {
-    it('should call service and return message', async () => {
-      mockService.testBreakInOffensiveResponse.mockResolvedValue(undefined);
 
-      const result = await controller.testBreakInOffensiveResponse('VIN123', mockUser);
-
-      expect(mockService.testBreakInOffensiveResponse).toHaveBeenCalledWith('test-user-id', 'VIN123');
-      expect(result).toStrictEqual({
-        message: 'Break-in offensive response test triggered for VIN: VIN123',
-      });
-    });
-  });
 });

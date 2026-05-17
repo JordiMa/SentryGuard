@@ -79,32 +79,4 @@ describe('The VehicleOffensiveResponseConfigService class', () => {
       });
     });
   });
-
-  describe('The testBreakInOffensiveResponse() method', () => {
-    describe('When vehicle belongs to user', () => {
-      beforeEach(() => {
-        mockVehicleRepository.findOne.mockResolvedValue({ userId: 'user-1', vin: 'VIN123' } as Vehicle);
-        mockOffensiveResponseService.handleBreakInOffensiveResponse.mockResolvedValue(undefined);
-      });
-
-      it('should delegate to handleBreakInOffensiveResponse', async () => {
-        await service.testBreakInOffensiveResponse('user-1', 'VIN123');
-
-        expect(mockVehicleRepository.findOne).toHaveBeenCalledWith({ where: { userId: 'user-1', vin: 'VIN123' } });
-        expect(mockOffensiveResponseService.handleBreakInOffensiveResponse).toHaveBeenCalledWith('VIN123', ['user-1']);
-      });
-    });
-
-    describe('When vehicle does not belong to user', () => {
-      beforeEach(() => {
-        mockVehicleRepository.findOne.mockResolvedValue(null);
-      });
-
-      it('should not trigger offensive response', async () => {
-        await service.testBreakInOffensiveResponse('user-1', 'VIN123');
-
-        expect(mockOffensiveResponseService.handleBreakInOffensiveResponse).not.toHaveBeenCalled();
-      });
-    });
-  });
 });

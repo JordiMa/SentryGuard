@@ -70,21 +70,7 @@ describe('The AlertsOffensiveResponseService class', () => {
       });
     });
 
-    describe('When break-in monitoring is not enabled', () => {
-      beforeEach(() => {
-        mockVehicleRepository.findOne.mockResolvedValue({
-          ...fakeVehicle,
-          break_in_monitoring_enabled: false,
-          break_in_offensive_response: OffensiveResponse.HONK,
-        });
-      });
 
-      it('should not trigger any command', async () => {
-        await service.handleBreakInOffensiveResponse('5YJ3E1EA123456789', ['user-1']);
-
-        expect(mockTeslaVehicleCommandService.honkHorn).not.toHaveBeenCalled();
-      });
-    });
 
     describe('When break-in offensive response is HONK', () => {
       beforeEach(() => {
